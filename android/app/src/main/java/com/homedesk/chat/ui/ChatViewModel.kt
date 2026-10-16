@@ -1,0 +1,231 @@
+package com.homedesk.chat.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.homedesk.chat.AppGraph
+import com.homedesk.chat.data.ChatMessage
+import com.homedesk.chat.data.Conversation
+import com.homedesk.chat.data.DeskDefaults
+import com.homedesk.chat.data.conversationTitle
+import com.homedesk.chat.data.modelHistory
+import com.homedesk.chat.net.ChatStream
+import com.homedesk.chat.net.DeskCallException
+import com.homedesk.chat.net.ModelInfo
+import com.homedesk.chat.net.StreamEvent
+import com.homedesk.chat.net.explainTransport
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.io.IOException
+import java.util.UUID
+
+data class ChatUiState(
+    val ready: Boolean = false,
+    val title: String = "New chat",
+    val model: String = DeskDefaults.MODEL,
+    val messages: List<ChatMessage> = emptyList(),
+    val draft: String = "",
+    val sending: Boolean = false,
+    val streamingId: String? = null,
+    val banner: String? = null,
+    val models: List<ModelInfo> = emptyList(),
+    val modelsMessage: String? = null,
+)
+
+class ChatViewModel(
+    private val conversationId: String,
+    private val graph: AppGraph,
+) : ViewModel() {
+    private val _state = MutableStateFlow(ChatUiState(model = graph.settings.get().model))
+    val state: StateFlow<ChatUiState> = _state.asStateFlow()
+    private var stream: ChatStream? = null
+    private var tokensSinceSave = 0
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = graph.chats.get(conversationId)
+            val settings = graph.settings.get()
+            val model = settings.model.ifBlank { existing?.model ?: DeskDefaults.MODEL }
+            _state.update {
+                it.copy(
+                    ready = true,
+                    title = existing?.title ?: "New chat",
+                    model = model,
+                    messages = existing?.messages ?: emptyList(),
+                )
+            }
+        }
+    }
+
+    fun onDraft(value: String) = _state.update { it.copy(draft = value) }
+
+    fun dismissBanner() = _state.update { it.copy(banner = null) }
+
+    fun loadModels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val settings = graph.settings.get()
+            if (!settings.isReady) {
+                _state.update {
+                    it.copy(modelsMessage = "Save the server URL and API key in Settings to load the model list. You can still type a model name.")
+                }
+                return@launch
+            }
+            try {
+                val models = graph.api.listModels(settings.baseUrl, settings.apiKey)
+                _state.update {
+                    it.copy(
+                        models = models,
+                        modelsMessage = if (models.isEmpty()) {
+                            "Ollama has no models yet. On the PC run: ollama pull qwen2.5:7b"
+                        } else {
+                            null
+                        },
+                    )
+                }
+            } catch (error: DeskCallException) {
+                _state.update { it.copy(modelsMessage = error.message) }
+            } catch (error: IOException) {
+                _state.update { it.copy(modelsMessage = explainTransport(error, settings.baseUrl)) }
+            }
+        }
+    }
+
+    fun selectModel(model: String) {
+        val clean = model.trim()
+        if (clean.isEmpty()) return
+        _state.update { it.copy(model = clean, banner = null) }
+        val current = graph.settings.get()
+        graph.settings.save(current.copy(model = clean))
+        viewModelScope.launch(Dispatchers.IO) {
+            val settings = graph.settings.get()
+            if (!settings.isReady) return@launch
+            try {
+                graph.api.selectModel(settings.baseUrl, settings.apiKey, clean)
+            } catch (error: DeskCallException) {
+                _state.update { it.copy(banner = error.message) }
+            } catch (error: IOException) {
+                _state.update { it.copy(banner = explainTransport(error, settings.baseUrl)) }
+            }
+        }
+    }
+
+    fun send() {
+        val snapshot = _state.value
+        val text = snapshot.draft.trim()
+        if (text.isEmpty() || snapshot.sending || !snapshot.ready) return
+        val settings = graph.settings.get()
+        if (!settings.isReady) {
+            _state.update { it.copy(banner = "Add the server URL and API key in Settings.") }
+            return
+        }
+        val user = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            role = "user",
+            content = text,
+            createdAt = System.currentTimeMillis(),
+        )
+        val assistantId = UUID.randomUUID().toString()
+        val assistant = ChatMessage(
+            id = assistantId,
+            role = "assistant",
+            content = "",
+            createdAt = System.currentTimeMillis(),
+        )
+        val messages = snapshot.messages + user + assistant
+        _state.update {
+            it.copy(
+                draft = "",
+                sending = true,
+                banner = null,
+                messages = messages,
+                title = conversationTitle(messages),
+                streamingId = assistantId,
+            )
+        }
+        val outbound = modelHistory(messages.filter { it.id != assistantId })
+        val model = _state.value.model
+        viewModelScope.launch(Dispatchers.IO) {
+            persist()
+            val call = graph.api.openChat(settings.baseUrl, settings.apiKey, model, outbound)
+            stream = call
+            try {
+                call.read { event ->
+                    when (event) {
+                        is StreamEvent.Token -> appendToken(assistantId, event.text)
+                        is StreamEvent.Done -> Unit
+                        is StreamEvent.Error -> showError(assistantId, event.message)
+                    }
+                }
+            } catch (error: DeskCallException) {
+                showError(assistantId, error.message ?: "The server rejected that message.")
+            } catch (error: IOException) {
+                if (!call.isCanceled()) {
+                    showError(assistantId, explainTransport(error, settings.baseUrl))
+                }
+            } finally {
+                stream = null
+                _state.update { it.copy(sending = false, streamingId = null) }
+                persist()
+            }
+        }
+    }
+
+    fun stop() {
+        stream?.cancel()
+    }
+
+    override fun onCleared() {
+        stream?.cancel()
+        super.onCleared()
+    }
+
+    private fun appendToken(id: String, text: String) {
+        _state.update { state ->
+            state.copy(
+                messages = state.messages.map { message ->
+                    if (message.id == id) message.copy(content = message.content + text) else message
+                },
+            )
+        }
+        tokensSinceSave += 1
+        if (tokensSinceSave >= 24) {
+            tokensSinceSave = 0
+            persist()
+        }
+    }
+
+    private fun showError(id: String, message: String) {
+        _state.update { state ->
+            state.copy(
+                banner = message,
+                messages = state.messages.map { item ->
+                    if (item.id != id) {
+                        item
+                    } else if (item.content.isBlank()) {
+                        item.copy(content = message, error = true)
+                    } else {
+                        item.copy(content = item.content + "\n\n" + message, error = true)
+                    }
+                },
+            )
+        }
+    }
+
+    private fun persist() {
+        val snapshot = _state.value
+        val kept = snapshot.messages.filter { it.content.isNotBlank() }
+        if (kept.isEmpty()) return
+        graph.chats.upsert(
+            Conversation(
+                id = conversationId,
+                title = conversationTitle(kept),
+                model = snapshot.model,
+                updatedAt = System.currentTimeMillis(),
+                messages = kept,
+            ),
+        )
+    }
+}
