@@ -8,6 +8,13 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
 
+## Get the code
+
+```bash
+git clone https://github.com/Strobingn/HomeAI.git
+cd HomeAI
+```
+
 ## What you need
 
 - The desktop PC (Windows or Linux) with the NVIDIA GPU and Ollama already installed
