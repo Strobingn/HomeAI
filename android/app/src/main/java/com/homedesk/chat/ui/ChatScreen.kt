@@ -1,5 +1,6 @@
 package com.homedesk.chat.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,18 +12,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -39,7 +45,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -110,10 +118,16 @@ fun ChatScreen(
                             showModels = true
                         },
                     ) {
+                        Icon(
+                            Icons.Filled.Memory,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp).size(16.dp),
+                        )
                         Text(
                             state.model,
                             maxLines = 1,
-                            modifier = Modifier.widthIn(max = 140.dp),
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 120.dp),
                         )
                     }
                 },
@@ -138,7 +152,7 @@ fun ChatScreen(
                 }
                 Row(
                     verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedTextField(
                         value = state.draft,
@@ -146,17 +160,20 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Message") },
                         maxLines = 6,
-                        shape = FieldShapes.search,
+                        shape = RoundedCornerShape(24.dp),
                     )
                     if (state.sending) {
-                        IconButton(onClick = viewModel::stop, modifier = Modifier.padding(bottom = 4.dp)) {
+                        FilledIconButton(
+                            onClick = viewModel::stop,
+                            modifier = Modifier.padding(bottom = 4.dp).size(48.dp),
+                        ) {
                             Icon(Icons.Filled.Stop, contentDescription = "Stop")
                         }
                     } else {
-                        IconButton(
+                        FilledIconButton(
                             onClick = viewModel::send,
                             enabled = state.draft.isNotBlank() && state.ready,
-                            modifier = Modifier.padding(bottom = 4.dp),
+                            modifier = Modifier.padding(bottom = 4.dp).size(48.dp),
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                         }
@@ -172,14 +189,12 @@ fun ChatScreen(
                 }
             }
             state.messages.isEmpty() -> {
-                Box(Modifier.padding(padding).fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Ask something. The reply streams from the PC.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
+                EmptyHint(
+                    title = "Start a chat",
+                    body = "Ask something. The reply streams from the PC as it is written.",
+                    icon = Icons.AutoMirrored.Filled.Chat,
+                    modifier = Modifier.padding(padding),
+                )
             }
             else -> {
                 LazyColumn(
@@ -206,39 +221,64 @@ private fun MessageRow(message: ChatMessage, pending: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom,
     ) {
-        if (isUser) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceBright,
-                modifier = Modifier.fillMaxWidth(0.86f),
+        if (!isUser) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 8.dp, bottom = 2.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
+                Text(
+                    "D",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+        val bubbleColor = when {
+            isUser -> MaterialTheme.colorScheme.primary
+            message.error -> MaterialTheme.colorScheme.errorContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        }
+        val textColor = when {
+            isUser -> MaterialTheme.colorScheme.onPrimary
+            message.error -> MaterialTheme.colorScheme.onErrorContainer
+            pending -> MaterialTheme.colorScheme.onSurfaceVariant
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+        Surface(
+            shape = if (isUser) {
+                RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
+            } else {
+                RoundedCornerShape(6.dp, 22.dp, 22.dp, 22.dp)
+            },
+            color = bubbleColor,
+            modifier = Modifier.fillMaxWidth(if (isUser) 0.82f else 0.88f),
+        ) {
+            if (pending) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text("Working…", style = MaterialTheme.typography.bodyLarge, color = textColor)
+                }
+            } else {
                 Text(
                     message.content,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Desk",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = when {
-                        pending -> "Working…"
-                        else -> message.content
-                    },
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = when {
-                        message.error -> MaterialTheme.colorScheme.error
-                        pending -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onBackground
-                    },
+                    color = textColor,
                 )
             }
         }

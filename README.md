@@ -108,11 +108,11 @@ This build is a debug APK. Android may warn that it is from an unknown developer
 
 1. Open Desk.
 2. Tap **Open Settings** (or the Settings tab).
-3. Server URL: the Wi-Fi address from the Desk window, such as `http://192.168.1.20:8787`.
-4. API key: the value after `API_KEY=` in `config/.env`. The Show button reveals what you typed.
-5. Tap **Test connection**.
+3. Server URL: the Wi-Fi address from the Desk window, such as `http://192.168.1.20:8787`. If you leave the port off, the app uses `8787`. Do not use `localhost` (that is the phone) or port `11434` (that is Ollama).
+4. API key: the value after `API_KEY=` in `config/.env`. Pasting the whole `API_KEY=...` line is fine; the label is removed when you save. The eye button reveals what you typed.
+5. Read the checklist under **On this phone**. It checks the address, the key, and the model before any network call. Then tap **Test connection**.
 
-You want a green **Connected** card, and a line that says `qwen2.5:7b is loaded and ready.` The first test after a reboot can take a few seconds while the model loads into VRAM.
+You want the route Phone → Desk → GPU to turn green, and a line that says `qwen2.5:7b is loaded and ready.` The first test after a reboot can take a few seconds while the model loads into VRAM. If the PC answers but Ollama is down, the Desk step stays green and the GPU step turns red. That is not a bad URL.
 
 Then go Home and tap **New chat**. The reply streams onto the screen. Chats are stored on the phone.
 
@@ -188,7 +188,9 @@ You can also change the default before the first start by editing `DEFAULT_MODEL
 
 ## Troubleshooting
 
-**The phone says it can't reach the desk.** The Desk window must still be open. The URL must start with `http://` and include `:8787`. The phone must be on the same Wi-Fi as the PC, or on Tailscale. Some guest networks block phones from seeing computers. Use the main Wi-Fi.
+**The phone says it can't reach the desk.** The Desk window must still be open. The URL must start with `http://` and include `:8787` (the app adds that port if you leave it off). The phone must be on the same Wi-Fi as the PC, or on Tailscale. Some guest networks block phones from seeing computers. Use the main Wi-Fi. `localhost` and `127.0.0.1` point at the phone, not the PC.
+
+**The checklist says port 11434.** That address is Ollama. Desk is the URL from the start window, on port 8787.
 
 **API key was rejected.** Copy the value after `API_KEY=` again. Do not include the quotes or the name `API_KEY`.
 

@@ -6,6 +6,8 @@ import com.homedesk.chat.AppGraph
 import com.homedesk.chat.data.Conversation
 import com.homedesk.chat.net.DeskCallException
 import com.homedesk.chat.net.DeskStatus
+import com.homedesk.chat.net.LinkState
+import com.homedesk.chat.net.SettingCheck
 import com.homedesk.chat.net.explainTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,9 @@ data class HomeUiState(
     val ok: Boolean = false,
     val headline: String = "",
     val detail: String = "",
+    val desk: LinkState = LinkState.Unknown,
+    val gpu: LinkState = LinkState.Unknown,
+    val checks: List<SettingCheck> = emptyList(),
     val recent: Conversation? = null,
 )
 
@@ -63,6 +68,9 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
                     ok = status.ok,
                     headline = status.headline,
                     detail = status.detail,
+                    desk = status.desk,
+                    gpu = status.gpu,
+                    checks = status.checks,
                     recent = recent,
                 )
             }
