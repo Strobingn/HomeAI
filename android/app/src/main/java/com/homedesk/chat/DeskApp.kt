@@ -22,7 +22,7 @@ class DeskApp : Application() {
 class AppGraph(app: Application) {
     val http: OkHttpClient = OkHttpClient.Builder()
         .proxy(Proxy.NO_PROXY)
-        .connectTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .callTimeout(0, TimeUnit.SECONDS)

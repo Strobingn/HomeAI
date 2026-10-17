@@ -7,6 +7,7 @@ internal fun statusHeadline(message: String): String {
             "did not answer" in message ||
             "refused the connection" in message ||
             "Can't reach" in message ||
+            "no route" in message ||
             "starts with http://" in message -> "Can't reach the desk"
         else -> "The desk needs attention"
     }

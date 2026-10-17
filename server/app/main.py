@@ -108,9 +108,13 @@ async def _health(app: FastAPI) -> HealthOut:
     model = app.state.models.selected
     ollama = app.state.ollama
     try:
-        version = await ollama.version()
-        installed = await ollama.tags()
-        running = await ollama.running_names()
+        # One round trip of latency, not three. A down or busy Ollama used to
+        # hold /health open long enough that the phone reported it as unreachable.
+        version, installed, running = await asyncio.gather(
+            ollama.version(),
+            ollama.tags(),
+            ollama.running_names(),
+        )
     except OllamaUnreachable:
         return HealthOut(
             status="degraded",

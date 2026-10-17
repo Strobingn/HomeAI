@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.homedesk.chat.AppGraph
 import com.homedesk.chat.data.DeskDefaults
 import com.homedesk.chat.data.DeskSettings
+import com.homedesk.chat.net.ApiKey
 import com.homedesk.chat.net.DeskCallException
 import com.homedesk.chat.net.DeskStatus
+import com.homedesk.chat.net.LinkState
 import com.homedesk.chat.net.ModelInfo
+import com.homedesk.chat.net.ServerUrl
 import com.homedesk.chat.net.explainTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,11 +32,13 @@ data class SettingsUiState(
     val manualModel: String = DeskDefaults.MODEL,
     val selectedModel: String = DeskDefaults.MODEL,
     val loadingModels: Boolean = false,
+    val notice: String? = null,
 )
 
 class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+    private var testGeneration = 0
 
     init {
         val saved = graph.settings.get()
@@ -43,11 +48,23 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
             manualModel = saved.model,
             selectedModel = saved.model,
         )
+        if (saved.isReady &&
+            ServerUrl.review(saved.baseUrl).state != LinkState.Bad &&
+            ApiKey.review(saved.apiKey).state != LinkState.Bad
+        ) {
+            test()
+        }
     }
 
-    fun onUrl(value: String) = _state.update { it.copy(baseUrl = value) }
+    fun onUrl(value: String) {
+        testGeneration += 1
+        _state.update { it.copy(baseUrl = value, status = null, notice = null, testing = false) }
+    }
 
-    fun onKey(value: String) = _state.update { it.copy(apiKey = value) }
+    fun onKey(value: String) {
+        testGeneration += 1
+        _state.update { it.copy(apiKey = value, status = null, notice = null, testing = false) }
+    }
 
     fun onManualModel(value: String) = _state.update { it.copy(manualModel = value) }
 
@@ -64,38 +81,52 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
         )
         val saved = graph.settings.get()
         _state.update {
-            it.copy(baseUrl = saved.baseUrl, apiKey = saved.apiKey, selectedModel = saved.model)
+            it.copy(
+                baseUrl = saved.baseUrl,
+                apiKey = saved.apiKey,
+                selectedModel = saved.model,
+                notice = "Saved on this phone.",
+            )
         }
     }
 
     fun test() {
         val snapshot = _state.value
-        if (snapshot.baseUrl.isBlank()) {
+        val urlReview = ServerUrl.review(snapshot.baseUrl)
+        val keyReview = ApiKey.review(snapshot.apiKey)
+        if (snapshot.baseUrl.isBlank() || urlReview.state == LinkState.Bad) {
+            testGeneration += 1
             _state.update {
                 it.copy(
+                    notice = null,
                     status = DeskStatus(
                         ok = false,
-                        headline = "URL needed",
-                        detail = "Enter the server URL. It looks like http://192.168.1.20:8787.",
+                        headline = "Check the server address",
+                        detail = urlReview.note,
+                        desk = LinkState.Bad,
                     ),
                 )
             }
             return
         }
-        if (snapshot.apiKey.isBlank()) {
+        if (snapshot.apiKey.isBlank() || keyReview.state == LinkState.Bad) {
+            testGeneration += 1
             _state.update {
                 it.copy(
+                    notice = null,
                     status = DeskStatus(
                         ok = false,
-                        headline = "API key needed",
-                        detail = "Enter the API key from config/.env on the PC.",
+                        headline = "Check the API key",
+                        detail = keyReview.note,
                     ),
                 )
             }
             return
         }
         save()
+        _state.update { it.copy(notice = null) }
         val settings = graph.settings.get()
+        val generation = ++testGeneration
         viewModelScope.launch {
             _state.update { it.copy(testing = true, status = null) }
             val status = withContext(Dispatchers.IO) {
@@ -112,6 +143,7 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
                     )
                 }
             }
+            if (generation != testGeneration) return@launch
             _state.update { it.copy(testing = false, status = status) }
             if (status.listModels) {
                 refreshModels()

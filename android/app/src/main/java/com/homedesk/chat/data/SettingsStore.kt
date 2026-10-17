@@ -1,6 +1,7 @@
 package com.homedesk.chat.data
 
 import android.content.Context
+import com.homedesk.chat.net.ApiKey
 import com.homedesk.chat.net.ServerUrl
 
 data class DeskSettings(
@@ -26,7 +27,7 @@ class SettingsStore(context: Context) {
         val model = settings.model.trim().ifBlank { DeskDefaults.MODEL }
         prefs.edit()
             .putString(URL, ServerUrl.normalize(settings.baseUrl))
-            .putString(KEY, settings.apiKey.trim().trim('"').trim('\''))
+            .putString(KEY, ApiKey.clean(settings.apiKey))
             .putString(MODEL, model)
             .commit()
     }
