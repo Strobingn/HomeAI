@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 
 sealed interface StreamEvent {
     data class Token(val text: String) : StreamEvent
-    data class Done(val model: String?) : StreamEvent
+    data class Done(val model: String?, val proposed: String? = null) : StreamEvent
     data class Error(val message: String) : StreamEvent
 }
 
@@ -31,7 +31,7 @@ object SseParser {
             events += StreamEvent.Token(event.content)
         }
         if (event.done) {
-            events += StreamEvent.Done(event.model)
+            events += StreamEvent.Done(event.model, event.proposed)
         }
         return events
     }
@@ -43,4 +43,5 @@ private data class StreamDto(
     val done: Boolean = false,
     val error: String? = null,
     val model: String? = null,
+    val proposed: String? = null,
 )

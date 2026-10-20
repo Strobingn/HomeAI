@@ -2,8 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from app.config import DEFAULT_MODEL, clean_model, parse_keep_alive, parse_num_ctx
-from app.ensure_config import current_api_key, ensure_env, upsert_key
+from app.config import (
+    DEFAULT_MODEL,
+    clean_model,
+    parse_allowed_roots,
+    parse_keep_alive,
+    parse_max_text_bytes,
+    parse_max_upload_bytes,
+    parse_num_ctx,
+)
+from app.ensure_config import append_file_settings, current_api_key, ensure_env, upsert_key
 from app.ollama import build_chat_body, build_warm_body
 
 
@@ -57,6 +65,28 @@ def test_ensure_env_fills_a_blank_key_once(tmp_path: Path) -> None:
     assert "DEFAULT_MODEL=qwen2.5:7b" in text
     assert ensure_env(tmp_path) is None
     assert current_api_key((config / ".env").read_text(encoding="utf-8")) == created
+
+
+def test_allowed_roots_default_to_every_drive() -> None:
+    assert parse_allowed_roots(None) == ("ALL",)
+    assert parse_allowed_roots("ALL") == ("ALL",)
+    assert parse_max_upload_bytes("200") == 200 * 1024 * 1024
+    assert parse_max_text_bytes(None) == 1_000_000
+    with pytest.raises(SystemExit):
+        parse_max_upload_bytes("0")
+
+
+def test_append_file_settings_is_idempotent() -> None:
+    once = append_file_settings("API_KEY=abc\n")
+    assert "ALLOWED_ROOTS=ALL" in once
+    assert "CODER_MODEL=qwen2.5-coder:14b" in once
+    twice = append_file_settings(once)
+    assigned = [
+        line.strip()
+        for line in twice.splitlines()
+        if line.strip().startswith("ALLOWED_ROOTS=")
+    ]
+    assert assigned == ["ALLOWED_ROOTS=ALL"]
 
 
 def test_upsert_key_replaces_only_the_key_line() -> None:

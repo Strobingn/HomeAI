@@ -20,6 +20,8 @@ from pydantic import BaseModel, Field
 from app.addresses import banner_lines
 from app.auth import require_api_key
 from app.config import Settings, clean_model
+from app.file_routes import attach_chat_file, register_file_routes
+from app.files import FileAccessError, FileService
 from app.messages import chat_stopped_message, missing_model_message, unreachable_message
 from app.ollama import (
     HttpxOllama,
@@ -76,6 +78,7 @@ class MessageIn(BaseModel):
 class ChatIn(BaseModel):
     model: str | None = None
     messages: list[MessageIn] = Field(min_length=1, max_length=100)
+    file: str | None = None
 
 
 def sse(payload: dict[str, Any]) -> str:
@@ -167,7 +170,18 @@ async def warm_selected(app: FastAPI) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     model = app.state.models.selected
-    print("\n".join(banner_lines(settings.host, settings.port, settings.env_path, model)), flush=True)
+    print(
+        "\n".join(
+            banner_lines(
+                settings.host,
+                settings.port,
+                settings.env_path,
+                model,
+                files_all_drives=settings.allowed_roots == ("ALL",),
+            )
+        ),
+        flush=True,
+    )
     task: asyncio.Task[None] | None = None
     if settings.warm_on_start:
         task = asyncio.create_task(warm_selected(app))
@@ -182,7 +196,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await app.state.ollama.aclose()
 
 
-def create_app(settings: Settings | None = None, ollama: Any | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    ollama: Any | None = None,
+    file_service: FileService | None = None,
+) -> FastAPI:
     settings = settings or Settings.load()
     if ollama is None:
         ollama = HttpxOllama(
@@ -199,13 +217,19 @@ def create_app(settings: Settings | None = None, ollama: Any | None = None) -> F
     app.state.settings = settings
     app.state.ollama = ollama
     app.state.models = ModelStore(settings.state_path, settings.default_model)
+    app.state.files = file_service or FileService(
+        allowed_roots=settings.allowed_roots,
+        max_upload_bytes=settings.max_upload_bytes,
+        max_text_bytes=settings.max_text_bytes,
+    )
 
     @app.exception_handler(RequestValidationError)
-    async def invalid_request(_: Request, __: RequestValidationError) -> JSONResponse:
-        return JSONResponse(
-            status_code=422,
-            content={"detail": "The chat request was missing a message."},
-        )
+    async def invalid_request(request: Request, __: RequestValidationError) -> JSONResponse:
+        if request.url.path == "/chat":
+            detail = "The chat request was missing a message."
+        else:
+            detail = "The request was missing something Desk needs."
+        return JSONResponse(status_code=422, content={"detail": detail})
 
     @app.get("/")
     async def root() -> dict[str, str]:
@@ -283,11 +307,23 @@ def create_app(settings: Settings | None = None, ollama: Any | None = None) -> F
         else:
             model = request.app.state.models.selected
         messages = [{"role": item.role, "content": item.content} for item in body.messages]
+        context_tokens = settings_now.num_ctx
+        attached = (body.file or "").strip()
+        if attached:
+            try:
+                messages, context_tokens = attach_chat_file(
+                    request.app.state.files,
+                    attached,
+                    messages,
+                    settings_now.num_ctx,
+                )
+            except FileAccessError as exc:
+                raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
         payload = build_chat_body(
             model,
             messages,
             settings_now.keep_alive,
-            settings_now.num_ctx,
+            context_tokens,
             settings_now.temperature,
         )
         log.info("chat model=%s messages=%d", model, len(messages))
@@ -322,6 +358,7 @@ def create_app(settings: Settings | None = None, ollama: Any | None = None) -> F
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    register_file_routes(app)
     return app
 
 

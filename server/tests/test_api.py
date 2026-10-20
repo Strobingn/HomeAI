@@ -91,9 +91,9 @@ class FakeOllama:
         yield {"message": {"role": "assistant", "content": ""}, "done": True}
 
 
-def _app(tmp_path: Path, fake: FakeOllama | None = None, **overrides: object):
+def _app(tmp_path: Path, fake: FakeOllama | None = None, file_service=None, **overrides: object):
     fake = fake or FakeOllama()
-    return create_app(make_settings(tmp_path, **overrides), fake), fake
+    return create_app(make_settings(tmp_path, **overrides), fake, file_service=file_service), fake
 
 
 def test_root_is_public(tmp_path: Path) -> None:
