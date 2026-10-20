@@ -15,9 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
@@ -447,7 +447,7 @@ private fun EntryRow(
     onDownload: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val icon = if (entry.kind == "dir") Icons.Filled.Folder else Icons.Filled.InsertDriveFile
+    val icon = if (entry.kind == "dir") Icons.Filled.Folder else Icons.AutoMirrored.Filled.InsertDriveFile
     FieldCard(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
