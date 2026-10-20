@@ -13,8 +13,11 @@ from dotenv import load_dotenv
 # On a 12 GB NVIDIA card that leaves several gigabytes for the KV cache,
 # and a 7B Q4 generates tokens quickly. Speed is the point of this default.
 DEFAULT_MODEL = "qwen2.5:7b"
+DEFAULT_CODER_MODEL = "qwen2.5-coder:14b"
 DEFAULT_PORT = 8787
 DEFAULT_NUM_CTX = 4096
+DEFAULT_MAX_UPLOAD_MB = 200
+DEFAULT_MAX_TEXT_BYTES = 1_000_000
 
 _MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 
@@ -74,6 +77,41 @@ def clean_model(name: str) -> str:
     return text
 
 
+def parse_allowed_roots(raw: str | None) -> tuple[str, ...]:
+    """ALL means every drive. Otherwise a semicolon-separated folder list."""
+    text = "ALL" if raw is None else raw.strip()
+    if not text or text.upper() == "ALL":
+        return ("ALL",)
+    parts: list[str] = []
+    for piece in text.split(";"):
+        item = piece.strip().strip('"').strip("'")
+        if item:
+            parts.append(item)
+    return tuple(parts) if parts else ("ALL",)
+
+
+def parse_max_upload_bytes(raw: str | None) -> int:
+    text = (raw or str(DEFAULT_MAX_UPLOAD_MB)).strip()
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise SystemExit("MAX_UPLOAD_MB must be a whole number, for example 200.") from exc
+    if not 1 <= value <= 2048:
+        raise SystemExit("MAX_UPLOAD_MB must be between 1 and 2048.")
+    return value * 1024 * 1024
+
+
+def parse_max_text_bytes(raw: str | None) -> int:
+    text = (raw or str(DEFAULT_MAX_TEXT_BYTES)).strip()
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise SystemExit("MAX_TEXT_BYTES must be a whole number, for example 1000000.") from exc
+    if not 1024 <= value <= 20_000_000:
+        raise SystemExit("MAX_TEXT_BYTES must be between 1024 and 20000000.")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     api_key: str
@@ -89,6 +127,10 @@ class Settings:
     warm_on_start: bool
     connect_timeout: float = 2.0
     read_timeout: float = 8.0
+    allowed_roots: tuple[str, ...] = ("ALL",)
+    max_upload_bytes: int = DEFAULT_MAX_UPLOAD_MB * 1024 * 1024
+    max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES
+    coder_model: str = DEFAULT_CODER_MODEL
 
     @classmethod
     def load(cls) -> Settings:
@@ -119,6 +161,12 @@ class Settings:
         state_path = Path(state_raw) if state_raw else root / "config" / "state.json"
         ollama = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
 
+        coder_raw = os.environ.get("CODER_MODEL", DEFAULT_CODER_MODEL).strip() or DEFAULT_CODER_MODEL
+        try:
+            coder_model = clean_model(coder_raw)
+        except ValueError as exc:
+            raise SystemExit(f"CODER_MODEL is not valid. {exc}") from exc
+
         return cls(
             api_key=api_key,
             ollama_base_url=ollama or "http://127.0.0.1:11434",
@@ -131,4 +179,8 @@ class Settings:
             state_path=state_path,
             env_path=env_path,
             warm_on_start=as_bool(os.environ.get("WARM_ON_START"), True),
+            allowed_roots=parse_allowed_roots(os.environ.get("ALLOWED_ROOTS")),
+            max_upload_bytes=parse_max_upload_bytes(os.environ.get("MAX_UPLOAD_MB")),
+            max_text_bytes=parse_max_text_bytes(os.environ.get("MAX_TEXT_BYTES")),
+            coder_model=coder_model,
         )

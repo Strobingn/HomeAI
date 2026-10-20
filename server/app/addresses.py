@@ -57,7 +57,14 @@ def tailscale_ipv4() -> str | None:
     return None
 
 
-def banner_lines(host: str, port: int, env_path: Path, model: str) -> list[str]:
+def banner_lines(
+    host: str,
+    port: int,
+    env_path: Path,
+    model: str,
+    *,
+    files_all_drives: bool = True,
+) -> list[str]:
     lines = [
         "",
         "Desk server is listening.",
@@ -84,5 +91,9 @@ def banner_lines(host: str, port: int, env_path: Path, model: str) -> list[str]:
         )
     lines.append(f"API key file: {env_path}")
     lines.append(f"Warm model:   {model}")
+    if files_all_drives:
+        lines.append("Files: every drive on this PC. Set ALLOWED_ROOTS in config/.env to limit that.")
+    else:
+        lines.append("Files: only the folders listed in ALLOWED_ROOTS.")
     lines.append("")
     return lines

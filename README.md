@@ -178,6 +178,57 @@ ollama stop qwen2.5:7b
 
 Set the PC so it does not go to sleep while you want the phone to reach it. A sleeping PC will not answer.
 
+## Update an existing PC
+
+From the project folder (`C:\Users\Austin\HomeAI`):
+
+```bat
+git pull
+```
+
+Restart Desk so it installs the new Python packages and picks up the file settings.
+
+- If `start.bat` is open in a window, close that window and double-click `start.bat` again. The script installs anything new from `server\requirements.txt` (including `python-multipart`).
+- If Task Scheduler starts the gateway, open Task Scheduler, select the HomeAI Gateway task, choose End, then Run. That task should point at `start.bat`.
+
+The phone URL and the API key do not change. Install the new Desk APK over the old one.
+
+File access uses the same port, **8787**. You do not add a firewall rule for a new port. If the phone already connects, leave the firewall alone. The Windows note below is only for a PC that has never been allowed through.
+
+## Files on the PC
+
+The Files tab reads and writes the PC. By default that is every drive, not a short list of folders.
+
+`config/.env`:
+
+```
+ALLOWED_ROOTS=ALL
+MAX_UPLOAD_MB=200
+MAX_TEXT_BYTES=1000000
+CODER_MODEL=qwen2.5-coder:14b
+```
+
+`ALL` means every fixed, removable, and mapped drive (`C:`, `D:`, `F:`, and so on). Desk looks again each time you open Files, so a USB disk shows up after you plug it in. An older `config/.env` gets these lines the next time Desk starts. You can leave them as they are.
+
+To limit Desk later, list folders separated by semicolons and restart:
+
+```
+ALLOWED_ROOTS=C:\Users\Austin\Desktop;C:\Users\Austin\Downloads;D:\Work
+```
+
+On the phone:
+
+1. Open the Files tab. The first screen is the drives.
+2. Open a drive, then a folder. Upload picks files on the phone (more than one is fine) and sends them to that folder, with a progress bar.
+3. From another app, choose Share, then Desk. Pick the folder on the PC and upload.
+4. Tap a text file to read it. You can edit it yourself and tap Save. You do not have to use the model.
+5. Ask AI reads the file on the PC, streams a reply, and shows a preview of the proposed file. Nothing is overwritten until you tap Save. Save writes a `.bak` copy of the previous file beside it.
+6. In a chat, the attach button adds a PC file as context for the next message. That does not change the file.
+7. Delete moves the item to a `.trash` folder on that drive. It is not a permanent delete.
+8. Download saves a PC file onto the phone.
+
+Code files use `qwen2.5-coder:14b` when `ollama list` has it, and `DEFAULT_MODEL` otherwise. A file that is too big for the model's context can still be edited by hand. The screen says when the PC is offline, the API key was rejected, the file is too large, or the path is outside the allowed drives.
+
 ## Change the model
 
 In the phone: open a chat, tap the model name at the top, or use Settings. Pick a model from the list, or type a name and tap **Use this model**. Typing a name always works, even when the list has not loaded.
@@ -198,7 +249,7 @@ You can also change the default before the first start by editing `DEFAULT_MODEL
 
 **Port already in use.** Another Desk window is open. Close it, or set a different `PORT` in `config/.env` and use that port in the phone URL.
 
-**Windows firewall.** Allow Python on private networks. If you dismissed the prompt:
+**Windows firewall.** Desk still listens on port 8787 only. Allow Python on private networks. You do not add a second rule for files. If you dismissed the prompt:
 
 ```bat
 netsh advfirewall firewall add rule name="Home Desk" dir=in action=allow protocol=TCP localport=8787
@@ -227,7 +278,17 @@ Endpoints, all except `GET /` require `Authorization: Bearer <API_KEY>` (or `X-A
 | GET | `/models` | Models Ollama has downloaded |
 | GET | `/model` | The model Desk will keep warm |
 | PUT | `/model` | Select a model and load it |
-| POST | `/chat` | Stream a reply as `text/event-stream` |
+| POST | `/chat` | Stream a reply as `text/event-stream`. Optional `file` attaches a PC file as context and does not save it. |
+| GET | `/files/roots` | Drives, or the folders in `ALLOWED_ROOTS`. Detected on each call. |
+| GET | `/files/list` | One folder. Query: `path`. |
+| GET | `/files/read` | A text file as JSON. |
+| GET | `/files/download` | The file bytes. |
+| POST | `/files/upload` | Multipart upload into a folder. Limit `MAX_UPLOAD_MB` (200). |
+| POST | `/files/folder` | Create a folder. |
+| PUT | `/files/write` | Save text. Writes a `.bak` of the previous file first. |
+| POST | `/files/rename` | Rename inside the same folder. |
+| POST | `/files/delete` | Move to `.trash` on that drive. |
+| POST | `/files/ai` | Stream a proposed new version of a text file. Does not save it. |
 
 ## Tests
 

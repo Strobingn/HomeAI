@@ -60,10 +60,11 @@ class DeskApi(private val client: OkHttpClient) {
         apiKey: String,
         model: String,
         messages: List<OutboundMessage>,
+        file: String? = null,
     ): ChatStream {
         val payload = json.encodeToString(
             ChatBody.serializer(),
-            ChatBody(model = model, messages = messages),
+            ChatBody(model = model, messages = messages, file = file),
         )
         val request = Request.Builder()
             .url(baseUrl.trimEnd('/') + "/chat")
@@ -189,4 +190,5 @@ private data class ModelBody(val model: String)
 private data class ChatBody(
     val model: String,
     val messages: List<OutboundMessage>,
+    val file: String? = null,
 )

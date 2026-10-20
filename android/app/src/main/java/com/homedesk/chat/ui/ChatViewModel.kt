@@ -8,6 +8,7 @@ import com.homedesk.chat.data.Conversation
 import com.homedesk.chat.data.DeskDefaults
 import com.homedesk.chat.data.conversationTitle
 import com.homedesk.chat.data.modelHistory
+import com.homedesk.chat.data.pcFileName
 import com.homedesk.chat.net.ChatStream
 import com.homedesk.chat.net.DeskCallException
 import com.homedesk.chat.net.ModelInfo
@@ -28,6 +29,7 @@ data class ChatUiState(
     val model: String = DeskDefaults.MODEL,
     val messages: List<ChatMessage> = emptyList(),
     val draft: String = "",
+    val attachedPath: String? = null,
     val sending: Boolean = false,
     val streamingId: String? = null,
     val banner: String? = null,
@@ -61,6 +63,13 @@ class ChatViewModel(
     }
 
     fun onDraft(value: String) = _state.update { it.copy(draft = value) }
+
+    fun attach(path: String) {
+        if (path.isBlank()) return
+        _state.update { it.copy(attachedPath = path, banner = null) }
+    }
+
+    fun clearAttachment() = _state.update { it.copy(attachedPath = null) }
 
     fun dismissBanner() = _state.update { it.copy(banner = null) }
 
@@ -121,10 +130,16 @@ class ChatViewModel(
             _state.update { it.copy(banner = "Add the server URL and API key in Settings.") }
             return
         }
+        val attached = snapshot.attachedPath
+        val shown = if (attached.isNullOrBlank()) {
+            text
+        } else {
+            "Attached from the PC: ${pcFileName(attached)}\n\n$text"
+        }
         val user = ChatMessage(
             id = UUID.randomUUID().toString(),
             role = "user",
-            content = text,
+            content = shown,
             createdAt = System.currentTimeMillis(),
         )
         val assistantId = UUID.randomUUID().toString()
@@ -138,6 +153,7 @@ class ChatViewModel(
         _state.update {
             it.copy(
                 draft = "",
+                attachedPath = null,
                 sending = true,
                 banner = null,
                 messages = messages,
@@ -149,7 +165,7 @@ class ChatViewModel(
         val model = _state.value.model
         viewModelScope.launch(Dispatchers.IO) {
             persist()
-            val call = graph.api.openChat(settings.baseUrl, settings.apiKey, model, outbound)
+            val call = graph.api.openChat(settings.baseUrl, settings.apiKey, model, outbound, file = attached)
             stream = call
             try {
                 call.read { event ->

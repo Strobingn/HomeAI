@@ -15,6 +15,9 @@ class SseParserTest {
         val done = SseParser.parseLine("""data: {"done":true,"model":"qwen2.5:7b"}""")
         assertEquals(listOf(StreamEvent.Done("qwen2.5:7b")), done)
 
+        val proposed = SseParser.parseLine("""data: {"done":true,"model":"qwen2.5-coder:14b","proposed":"print(1)\n"}""")
+        assertEquals(listOf(StreamEvent.Done("qwen2.5-coder:14b", "print(1)\n")), proposed)
+
         val error = SseParser.parseLine("""data: {"error":"Ollama is not answering"}""")
         assertEquals(listOf(StreamEvent.Error("Ollama is not answering")), error)
     }
