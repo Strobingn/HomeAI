@@ -60,7 +60,7 @@ jobs:
         run: gradle --no-daemon testDebugUnitTest lintDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Desk-Dev-2.0.0-${{ github.run_number }}
+          name: Desk-Dev-2.1.0-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -105,7 +105,7 @@ jobs:
         run: gradle --no-daemon assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: Desk-Release-2.0.0
+          name: Desk-Release-2.1.0
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
       - name: Remove restored key

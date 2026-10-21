@@ -1,4 +1,4 @@
-# Desk 2.0
+# Desk 2.1
 
 Desk is a chat app for your phone. The model runs on your desktop PC, on the NVIDIA GPU you already have. The phone only shows the conversation.
 
@@ -7,6 +7,18 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 ```
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
+
+## Desk 2.1 UI update
+
+Version **2.1.0**, build **6**, adds a larger chat composer, editable starter prompts, a project-context sheet, a Latest shortcut for long chats, selectable user messages, adaptive navigation for wide screens, and a dedicated file editor with Edit / Ask AI / Review tabs. The editor keeps save actions visible and asks before discarding unsaved edits. GitHub still builds the APK without automatic tests or lint.
+
+To copy this branch onto a Windows PC's F drive, open PowerShell and run:
+
+```powershell
+git clone --branch codex/folder-ai-and-reliability https://github.com/Strobingn/HomeAI.git 'F:\home AI App'
+```
+
+The destination must be empty or absent; Git refuses to overwrite an existing nonempty folder. The cloud development workspace cannot write directly to the PC's F drive.
 
 ## Desk 2.0 Android interface
 

@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -62,7 +63,7 @@ fun FieldCard(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
     ) {
         Row(
             modifier = Modifier
@@ -287,5 +288,17 @@ fun ModelPicker(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+
+@Composable
+fun InlineNotice(message: String, onDismiss: (() -> Unit)? = null) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(message, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            if (onDismiss != null) TextButton(onClick = onDismiss) { Text("Dismiss") }
+        }
     }
 }

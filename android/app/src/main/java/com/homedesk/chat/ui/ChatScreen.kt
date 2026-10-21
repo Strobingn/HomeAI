@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
@@ -46,6 +45,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +89,7 @@ fun ChatScreen(
     conversationId: String,
     onBack: () -> Unit,
     onAttach: () -> Unit,
+    onNewChat: () -> Unit,
 ) {
     val graph = LocalGraph.current
     val viewModel: ChatViewModel = viewModel(
@@ -85,10 +100,17 @@ fun ChatScreen(
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showModels by rememberSaveable { mutableStateOf(false) }
+    var showContext by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var manual by remember(state.model) { mutableStateOf(state.model) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val owner = LocalLifecycleOwner.current
-    val widePadding = ((LocalConfiguration.current.screenWidthDp - 840) / 2).coerceAtLeast(0).dp
+    val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    val widePadding = ((width - 840.dp) / 2).coerceAtLeast(0.dp)
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty() && listState.firstVisibleItemIndex < 2) listState.animateScrollToItem(0)
+    }
     DisposableEffect(owner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -109,6 +131,8 @@ fun ChatScreen(
         ) {
             Column(
                 modifier = Modifier
+                    .heightIn(max = 640.dp)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = FieldMetrics.screenPadding)
                     .padding(bottom = 28.dp)
                     .windowInsetsPadding(WindowInsets.navigationBars),
@@ -126,6 +150,36 @@ fun ChatScreen(
                     },
                 )
             }
+        }
+    }
+
+    if (showContext && state.workspace != null) ModalBottomSheet(
+        onDismissRequest = { showContext = false },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp), contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Text("Project context", style = MaterialTheme.typography.headlineMedium)
+                Text(state.workspace.orEmpty(), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall)
+            }
+            val report = state.context
+            item {
+                if (report == null) Text("Send a message to see which files Desk reads.")
+                else {
+                    Text("${report.files.size} files read · ${report.omitted} omitted · ${report.skipped} skipped",
+                        style = MaterialTheme.typography.titleSmall)
+                    if (report.truncated) InlineNotice("The folder listing was capped. Choose a smaller subfolder or name the file you need.")
+                }
+                TextButton(onClick = { showContext = false; onAttach() }, enabled = !state.sending && !state.applying) {
+                    Text("Choose another folder")
+                }
+                HorizontalDivider()
+            }
+            items(report?.files.orEmpty(), key = { it }) { path ->
+                Text(path, style = MaterialTheme.typography.bodyMedium)
+            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -147,107 +201,19 @@ fun ChatScreen(
                 title = if (state.workspace != null) "Workspace chat" else if (state.title == "New chat") "New conversation" else state.title,
                 onBack = onBack,
                 actions = {
-                    TextButton(
-                        onClick = {
-                            manual = state.model
-                            viewModel.loadModels()
-                            showModels = true
-                        },
-                    ) {
-                        Text(
-                            state.model,
-                            maxLines = 1,
-                            modifier = Modifier.widthIn(max = 140.dp),
-                        )
+                    if (state.workspace != null) IconButton(onClick = { showContext = true }) {
+                        Icon(Icons.Filled.FolderOpen, "View project context")
                     }
+                    IconButton(onClick = onNewChat, enabled = !state.applying) { Icon(Icons.Filled.Add, "Start another chat") }
                 },
             )
         },
         bottomBar = {
-            Column(
-                modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                    .padding(horizontal = 12.dp + widePadding, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val banner = state.banner
-                if (!banner.isNullOrBlank()) {
-                    FieldCard(accent = MaterialTheme.colorScheme.error, onClick = viewModel::dismissBanner) {
-                        Text(
-                            banner,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                state.workspace?.let { folder ->
-                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                        Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.FolderOpen, null)
-                            Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp)) {
-                                Text(pcFileName(folder), style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                                Text(state.context?.let { "${it.files.size} files in context · ${it.omitted} omitted" }
-                                    ?: "Folder stays attached to this conversation", style = MaterialTheme.typography.bodySmall)
-                            }
-                            IconButton(onClick = { viewModel.setWorkspace(null) }, enabled = !state.sending && !state.applying) {
-                                Icon(Icons.Filled.Close, "Disconnect folder")
-                            }
-                        }
-                    }
-                }
-                val attached = state.attachedPath
-                if (!attached.isNullOrBlank()) {
-                    FieldCard(onClick = viewModel::clearAttachment) {
-                        Text("Attached from the PC", style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            pcFileName(attached),
-                            modifier = Modifier.padding(top = FieldMetrics.space4),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            "Tap to remove. The file is only context for the next message.",
-                            modifier = Modifier.padding(top = FieldMetrics.space4),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (!state.sending) {
-                        IconButton(
-                            onClick = onAttach,
-                            enabled = state.ready,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        ) {
-                            Icon(Icons.Filled.AttachFile, contentDescription = "Choose a PC file or folder")
-                        }
-                    }
-                    OutlinedTextField(
-                        value = state.draft,
-                        onValueChange = viewModel::onDraft,
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text(if (state.workspace != null) "Ask about this folder…" else "Message your home AI…") },
-                        maxLines = 6,
-                        shape = FieldShapes.search,
-                    )
-                    if (state.sending) {
-                        IconButton(onClick = viewModel::stop, modifier = Modifier.padding(bottom = 4.dp)) {
-                            Icon(Icons.Filled.Stop, contentDescription = "Stop")
-                        }
-                    } else {
-                        IconButton(
-                            onClick = viewModel::send,
-                            enabled = state.draft.isNotBlank() && state.ready && !state.applying,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
-                        }
-                    }
-                }
-            }
+            ChatComposer(state, viewModel::onDraft, viewModel::send, viewModel::stop, onAttach,
+                onRemoveAttachment = { if (state.workspace != null) viewModel.setWorkspace(null) else viewModel.clearAttachment() },
+                onWorkspaceDetails = { showContext = true },
+                onModel = { manual = state.model; viewModel.loadModels(); showModels = true },
+                onDismissBanner = viewModel::dismissBanner)
         },
     ) { padding ->
         when {
@@ -257,35 +223,38 @@ fun ChatScreen(
                 }
             }
             state.messages.isEmpty() -> {
-                Box(Modifier.padding(padding).fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Ask something. The reply streams from the PC.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
+                Column(Modifier.padding(padding).padding(horizontal = 24.dp + widePadding).fillMaxSize()
+                    .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center) {
+                    Text(if (state.workspace != null) "Your project.\nA fresh perspective." else "A little clarity.\nA new idea.",
+                        style = MaterialTheme.typography.displaySmall)
+                    Text(if (state.workspace != null) "Ask about this folder or describe a change you want to make."
+                        else "Ask a question, untangle a problem, or bring a folder into the conversation.",
+                        Modifier.padding(top = 12.dp, bottom = 24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val suggestions = if (state.workspace != null) listOf(
+                        "Explain this project" to "Explain how this project is organized and where it starts.",
+                        "Find possible bugs" to "Review the relevant files for likely bugs. Explain the evidence before proposing changes.",
+                        "Plan a change" to "Help me plan a change to this project. Start by explaining what is here.",
+                    ) else listOf(
+                        "Help me think it through" to "Help me think through a problem. Start by asking what I want to solve.",
+                        "Turn an idea into a plan" to "Help me turn an idea into clear, practical next steps.",
                     )
+                    suggestions.forEach { (label, prompt) ->
+                        FieldCard(Modifier.padding(bottom = 10.dp), onClick = { viewModel.onDraft(prompt) }) {
+                            Text(label, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                    if (state.workspace == null) TextButton(onClick = onAttach) { Text("Choose a project folder") }
                 }
             }
             else -> {
-                LazyColumn(
-                    modifier = Modifier.padding(padding).padding(horizontal = widePadding).fillMaxSize(),
+                Box(Modifier.padding(padding).padding(horizontal = widePadding).fillMaxSize()) {
+                  LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
                     reverseLayout = true,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    state.context?.let { report ->
-                        item(key = "workspace-context") {
-                            var expanded by remember { mutableStateOf(false) }
-                            FieldCard(onClick = { expanded = !expanded }) {
-                                Text("Folder context: ${report.files.size} files read · ${report.omitted} omitted · ${report.skipped} skipped",
-                                    style = MaterialTheme.typography.labelLarge)
-                                if (report.truncated) Text("The folder listing was capped. Mention a path to focus the next question.")
-                                if (expanded) Text(report.files.joinToString("\n").ifEmpty { "No file contents fit. Ask about a smaller folder." },
-                                    style = MaterialTheme.typography.bodySmall)
-                                else Text("Tap to see included files", style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                  ) {
                     items(state.messages.asReversed(), key = { it.id }) { message ->
                         MessageRow(
                             message = message,
@@ -294,6 +263,11 @@ fun ChatScreen(
                             onReview = viewModel::review,
                         )
                     }
+                  }
+                  if (listState.firstVisibleItemIndex > 1) ExtendedFloatingActionButton(
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+                    icon = { Icon(Icons.Filled.ArrowDownward, null) }, text = { Text("Latest") })
                 }
             }
         }
@@ -314,12 +288,10 @@ private fun MessageRow(message: ChatMessage, pending: Boolean, streaming: Boolea
                 color = MaterialTheme.colorScheme.surfaceBright,
                 modifier = Modifier.fillMaxWidth(0.86f),
             ) {
-                Text(
-                    message.content,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                SelectionContainer {
+                    Text(message.content, Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                }
             }
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
