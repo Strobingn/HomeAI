@@ -2,8 +2,10 @@ package com.homedesk.chat.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.homedesk.chat.BuildConfig
 import com.homedesk.chat.ui.theme.FieldMetrics
 import com.homedesk.chat.ui.theme.LocalChrome
 
@@ -128,10 +131,23 @@ fun SettingsScreen(bottomBar: @Composable () -> Unit = {}) {
             )
             Text(
                 "Default on a 12 GB GPU is qwen2.5:7b. It is fast and fits with room to spare.",
-                modifier = Modifier.padding(bottom = 28.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            SectionHeader("About")
+            Text(
+                "Desk v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            val serverVersion = state.status?.serverVersion
+            if (!serverVersion.isNullOrBlank()) {
+                Text(
+                    "Server v$serverVersion",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(28.dp))
         }
     }
 }

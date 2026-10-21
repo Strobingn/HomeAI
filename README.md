@@ -276,7 +276,7 @@ Endpoints, all except `GET /` require `Authorization: Bearer <API_KEY>` (or `X-A
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/` | Plain check that the process is up |
-| GET | `/health` | Ollama, selected model, whether it is loaded |
+| GET | `/health` | Ollama, selected model, whether it is loaded, and the gateway `version` |
 | GET | `/models` | Models Ollama has downloaded |
 | GET | `/model` | The model Desk will keep warm |
 | PUT | `/model` | Select a model and load it |

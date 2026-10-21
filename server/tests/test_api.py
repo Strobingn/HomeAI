@@ -127,6 +127,7 @@ def test_health_reports_a_warm_model(tmp_path: Path) -> None:
     assert body["model"] == "qwen2.5:7b"
     assert body["model_loaded"] is True
     assert body["ollama_version"] == "0.9.0"
+    assert body["version"] == "1.1.2"
 
 
 def test_health_when_ollama_is_down(tmp_path: Path) -> None:
