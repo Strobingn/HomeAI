@@ -11,6 +11,7 @@ data class HealthDto(
     val model: String? = null,
     @SerialName("model_loaded") val modelLoaded: Boolean = false,
     val detail: String? = null,
+    val version: String? = null,
 )
 
 data class DeskStatus(
@@ -18,6 +19,7 @@ data class DeskStatus(
     val headline: String,
     val detail: String,
     val listModels: Boolean = false,
+    val serverVersion: String? = null,
 )
 
 fun interpretHealth(health: HealthDto): DeskStatus {
@@ -28,10 +30,22 @@ fun interpretHealth(health: HealthDto): DeskStatus {
         } else {
             "$model is selected. The first message loads it."
         }
-        return DeskStatus(ok = true, headline = "Connected", detail = detail, listModels = true)
+        return DeskStatus(
+            ok = true,
+            headline = "Connected",
+            detail = detail,
+            listModels = true,
+            serverVersion = health.version?.takeIf { it.isNotBlank() },
+        )
     }
     val detail = health.detail?.takeIf { it.isNotBlank() }
         ?: "The server answered, but the model is not ready."
     val headline = if (health.ollama == "up") "The model is not ready" else "Ollama is not running"
-    return DeskStatus(ok = false, headline = headline, detail = detail, listModels = true)
+    return DeskStatus(
+        ok = false,
+        headline = headline,
+        detail = detail,
+        listModels = true,
+        serverVersion = health.version?.takeIf { it.isNotBlank() },
+    )
 }

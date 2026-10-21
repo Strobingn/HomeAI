@@ -35,6 +35,9 @@ from app.state import ModelStore
 
 log = logging.getLogger("desk")
 
+# Kept in step with the phone app version shown in Settings.
+SERVER_VERSION = "1.1.2"
+
 
 class HealthOut(BaseModel):
     status: str
@@ -43,6 +46,7 @@ class HealthOut(BaseModel):
     model: str
     model_loaded: bool
     detail: str | None = None
+    version: str = SERVER_VERSION
 
 
 class ModelOut(BaseModel):
@@ -210,7 +214,7 @@ def create_app(
         )
     app = FastAPI(
         title="Home Desk",
-        version="1.0.0",
+        version=SERVER_VERSION,
         description="Streams a local Ollama model to the Desk phone app.",
         lifespan=lifespan,
     )

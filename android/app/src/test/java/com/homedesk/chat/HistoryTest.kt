@@ -39,6 +39,12 @@ class HistoryTest {
         assertTrue(ready.ok)
         assertEquals("Connected", ready.headline)
         assertTrue(ready.detail.contains("loaded"))
+        assertEquals(null, ready.serverVersion)
+
+        val withServer = interpretHealth(
+            HealthDto(status = "ok", ollama = "up", model = "qwen2.5:7b", modelLoaded = true, version = "1.1.2"),
+        )
+        assertEquals("1.1.2", withServer.serverVersion)
 
         val missing = interpretHealth(
             HealthDto(
