@@ -13,12 +13,27 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
+    }
+
+    // One keystore in the repo, used on every machine. Android only installs an
+    // update when the signing certificate matches the app already on the phone.
+    signingConfigs {
+        create("sideload") {
+            storeFile = file("desk-sideload.keystore")
+            storePassword = "desk-sideload"
+            keyAlias = "desk"
+            keyPassword = "desk-sideload"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("sideload")
+        }
         release {
+            signingConfig = signingConfigs.getByName("sideload")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

@@ -104,6 +104,8 @@ Copy it to the phone (USB, email to yourself, or a shared folder). Open it. If A
 
 This build is a debug APK. Android may warn that it is from an unknown developer. That is expected.
 
+Debug and release builds are signed with `android/app/desk-sideload.keystore`, which is in the repo. The same key is used on every machine, so a newer APK installs over the previous one. If Android says the package conflicts with an existing package, the phone still has an older Desk that was signed with a different key. Uninstall that Desk once (this removes chats and the server URL stored on the phone), then install again. After that, updates install in place. Type the server URL and API key back into Settings.
+
 ## 4. Connect the phone
 
 1. Open Desk.
