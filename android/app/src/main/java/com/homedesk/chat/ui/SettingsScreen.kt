@@ -99,7 +99,7 @@ fun SettingsScreen(bottomBar: @Composable () -> Unit = {}) {
             )
             DeskOutlinedButton(text = "Save", onClick = viewModel::save)
             DeskButton(
-                text = if (state.testing) "Testing…" else "Test connection",
+                text = if (state.testing) "Testing…" else "Test connection & sync model",
                 onClick = viewModel::test,
                 enabled = !state.testing,
             )

@@ -14,6 +14,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import java.util.Collections
+import java.util.IdentityHashMap
 
 /**
  * Greyscale chrome from Wildlife FieldOps: near-black pages, lifted cards,
@@ -119,10 +121,14 @@ private val LightColors = lightColorScheme(
 )
 
 private fun Context.findActivity(): Activity? {
-    var current: Context? = this
-    while (current is ContextWrapper) {
+    val visited = Collections.newSetFromMap(IdentityHashMap<Context, Boolean>())
+    var current: Context = this
+    while (visited.add(current)) {
         if (current is Activity) return current
-        current = current.baseContext
+        val wrapper = current as? ContextWrapper ?: return null
+        val base: Context = wrapper.baseContext ?: return null
+        if (base !is Activity && base !is ContextWrapper) return null
+        current = base
     }
     return null
 }

@@ -32,13 +32,16 @@ def build_chat_body(
     num_ctx: int,
     temperature: float,
 ) -> dict[str, Any]:
-    return {
+    body: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": True,
         "keep_alive": keep_alive,
         "options": {"num_ctx": num_ctx, "temperature": temperature},
     }
+    if model.split(":", 1)[0].lower() in {"ornith-1.5", "qwen3.5"}:
+        body["think"] = False
+    return body
 
 
 def build_warm_body(model: str, keep_alive: int | str) -> dict[str, Any]:
@@ -134,6 +137,33 @@ class HttpxOllama:
             raise OllamaUnreachable(unreachable_message(self.base_url)) from exc
         await self._raise_for_model(response, str(body.get("model", "")))
 
+    async def pull_model(self, model: str) -> AsyncIterator[dict[str, Any]]:
+        """Stream Ollama's resumable registry download, without a short read timeout."""
+        complete = False
+        try:
+            async with self._http.stream("POST", "/api/pull", json={"model": model, "stream": True},
+                                         timeout=self._stream) as response:
+                if response.status_code >= 400:
+                    raw = (await response.aread()).decode("utf-8", errors="replace")
+                    raise OllamaError(_error_text(raw) or f"Model download failed ({response.status_code}).")
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise OllamaError("Ollama sent unreadable download progress. Update Ollama and retry.") from exc
+                    if not isinstance(chunk, dict):
+                        continue
+                    if chunk.get("error"):
+                        raise OllamaError(str(chunk["error"]))
+                    complete = chunk.get("status") == "success" or complete
+                    yield chunk
+        except httpx.HTTPError as exc:
+            raise OllamaUnreachable(unreachable_message(self.base_url)) from exc
+        if not complete:
+            raise OllamaError("The download stopped before completion. Run setup again; Ollama resumes downloaded layers.")
+
     async def stream_chat(self, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         model = str(body.get("model", ""))
         try:
@@ -176,3 +206,4 @@ class HttpxOllama:
         if status == 404 or "not found" in lowered or "try pulling" in lowered:
             raise ModelMissing(model, missing_model_message(model))
         raise OllamaError(message)
+

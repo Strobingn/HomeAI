@@ -102,7 +102,7 @@ def test_root_is_public(tmp_path: Path) -> None:
         response = client.get("/")
     assert response.status_code == 200
     assert response.json()["service"] == "home-desk"
-    assert response.json()["server_version"] == "2.1.1"
+    assert response.json()["server_version"] == "2.2.0"
     assert set(response.json()["capabilities"]) >= {"workspace_chat", "workspace_apply"}
 
 
@@ -129,7 +129,7 @@ def test_health_reports_a_warm_model(tmp_path: Path) -> None:
     assert body["model"] == "qwen2.5:7b"
     assert body["model_loaded"] is True
     assert body["ollama_version"] == "0.9.0"
-    assert body["server_version"] == "2.1.1"
+    assert body["server_version"] == "2.2.0"
     assert set(body["capabilities"]) >= {"workspace_chat", "workspace_apply"}
 
 

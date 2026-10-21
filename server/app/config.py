@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # On a 12 GB NVIDIA card that leaves several gigabytes for the KV cache,
 # and a 7B Q4 generates tokens quickly. Speed is the point of this default.
 DEFAULT_MODEL = "qwen2.5:7b"
-DEFAULT_CODER_MODEL = "qwen2.5-coder:14b"
+DEFAULT_CODER_MODEL = "ornith-1.5:9b"
 DEFAULT_PORT = 8787
 DEFAULT_NUM_CTX = 4096
 DEFAULT_MAX_UPLOAD_MB = 200

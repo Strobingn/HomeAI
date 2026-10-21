@@ -22,18 +22,22 @@ def current_api_key(text: str) -> str:
 
 
 def upsert_key(text: str, key: str) -> str:
+    return upsert_setting(text, "API_KEY", key)
+
+
+def upsert_setting(text: str, name: str, value: str) -> str:
     lines = text.splitlines()
     found = False
     output: list[str] = []
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("API_KEY=") and not stripped.startswith("#"):
-            output.append(f"API_KEY={key}")
+        if not stripped.startswith("#") and "=" in stripped and stripped.split("=", 1)[0].strip() == name:
+            output.append(f"{name}={value}")
             found = True
         else:
             output.append(line)
     if not found:
-        output.append(f"API_KEY={key}")
+        output.append(f"{name}={value}")
     return "\n".join(output).rstrip() + "\n"
 
 
@@ -42,7 +46,7 @@ _FILE_DEFAULTS = (
     ("ALLOW_ALL_DRIVES", "0"),
     ("MAX_UPLOAD_MB", "200"),
     ("MAX_TEXT_BYTES", "1000000"),
-    ("CODER_MODEL", "qwen2.5-coder:14b"),
+    ("CODER_MODEL", "ornith-1.5:9b"),
 )
 
 

@@ -80,7 +80,7 @@ def test_allowed_roots_default_to_home_workspace() -> None:
 def test_append_file_settings_is_idempotent() -> None:
     once = append_file_settings("API_KEY=abc\n")
     assert "ALLOWED_ROOTS=\n" in once
-    assert "CODER_MODEL=qwen2.5-coder:14b" in once
+    assert "CODER_MODEL=ornith-1.5:9b" in once
     twice = append_file_settings(once)
     assigned = [
         line.strip()

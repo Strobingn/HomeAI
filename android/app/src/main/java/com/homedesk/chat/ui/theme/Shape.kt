@@ -8,16 +8,16 @@ val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(24.dp),
 )
 
 object FieldShapes {
     val card = RoundedCornerShape(24.dp)
-    val chip = RoundedCornerShape(100.dp)
-    val button = RoundedCornerShape(18.dp)
+    val chip = RoundedCornerShape(16.dp)
+    val button = RoundedCornerShape(16.dp)
     val search = RoundedCornerShape(16.dp)
-    val bottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val bottomSheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 }
 
 object FieldMetrics {

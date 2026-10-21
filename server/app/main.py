@@ -35,7 +35,7 @@ from app.state import ModelStore
 from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
-SERVER_VERSION = "2.1.1"
+SERVER_VERSION = "2.2.0"
 CAPABILITIES = ("workspace_chat", "workspace_apply")
 
 

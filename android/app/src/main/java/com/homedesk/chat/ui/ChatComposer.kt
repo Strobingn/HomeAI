@@ -46,7 +46,7 @@ fun ChatComposer(
                         Column(Modifier.fillMaxWidth()) {
                             Text(pcFileName(attached), style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(if (state.workspace != null) state.context?.let { "${it.files.size} files read · View context" }
+                            Text(if (state.workspace != null) state.context?.let { "${it.indexed} indexed · ${it.files.size} in this reply" }
                                 ?: "Folder workspace · View details" else "Attached for your next message",
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

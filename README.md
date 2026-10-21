@@ -1,4 +1,4 @@
-# Desk 2.1.1
+# Desk 2.2.0
 
 Desk is a chat app for your phone. The model runs on your desktop PC, on the NVIDIA GPU you already have. The phone only shows the conversation.
 
@@ -7,6 +7,34 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 ```
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
+
+## Desk 2.2: whole-project context and local coding model
+
+Version **2.2.0**, build **8**, fixes the misleading “choose a smaller subfolder” warning. A short model-side path preview no longer marks a completed project scan as capped. Source files that do not fit whole are now included as relevant line excerpts. Entry points, documentation and source outrank tiny build wrappers and unrelated tests. The project stays attached and is searched again for each question. **Project context** has a searchable project index and shows which files were used whole or as excerpts. Tapping a path prepares a focused question without changing folders.
+
+The theme now handles non-activity and cyclic context wrappers, uses consistent 16/24dp component corners, and supplies white/black system-bar fallbacks. Android's edge-to-edge mode may override bar colors on newer OS versions. The launcher uses 16-unit rounded corners in its 108-unit vector viewport. Private release builds enable R8 and resource shrinking, with real Android entry-point keep rules and retrace metadata; debug builds remain readable. The APK workflow also compiles the release shrinker so its configuration is checked without private signing credentials. Automatic tests and lint remain off.
+
+### Install the selected coding model on your PC
+
+The Windows launcher now checks both `py` and `python` for Python 3.11+, checks an existing virtual environment, and installs **Ornith-1.5 9B** through your local Ollama service on the first start of this version. It shows progress, verifies Ollama lists the model, unloads other resident models, loads the new model at the folder-chat context size, and only then updates `DEFAULT_MODEL`, `CODER_MODEL` and the selected-model state. The API key and other `.env` settings are preserved. A failed download does not select the new model or record setup as complete; Ollama can resume downloaded layers on the next start. Later starts keep subsequent model choices intact.
+
+Close the old gateway, update this branch, open Ollama, then run:
+
+```powershell
+.\start.bat
+```
+
+To explicitly rerun setup and select the recommendation again:
+
+```powershell
+.\start.bat --install-coder
+```
+
+After setup, use **Settings → Test connection & sync model** on the phone. This adopts the PC's selected model for subsequent chats. The cloud developer cannot download onto your PC or write its F drive; the launcher performs installation on the machine where you run it. Linux users can run `.venv/bin/python -m app.setup_coder` from the `server` directory after running `start.sh` once.
+
+As checked October 21, 2026: [Ornith-1.5-9B](https://huggingface.co/ornith-ai/Ornith-1.5-9B) is a recent coding/tool-use model; [Ollama's 4-bit build](https://ollama.com/library/ornith-1.5:9b) is about 6.6 GB. It is expected to fit a 12 GB GPU at moderate context sizes, but real GPU residency and speed must be checked on the PC with `ollama ps`. It is not claimed to be the newest Hub upload or the fastest model without a hardware benchmark. [Qwen3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5:4b-q4_K_M), about 3.3 GB, is a smaller speed-oriented alternative. HomeAI sends `think: false` for these families to reduce reasoning delay; that trades away some reasoning quality. Neither weights nor the current HomeAI gateway have web access by themselves: search/browsing requires a separately connected tool.
+
+`config/state.json` is generated runtime state and remains ignored by Git. Its `model` property is the selected Ollama tag restored at restart, used when requests do not explicitly choose a model. Generated state now includes a description; `config/state.example.json` documents the format. Do not commit your runtime state. Startup/shutdown and HTTP smoke checks live in `server/tests/test_lifecycle.py`, where pytest discovers them; `tests/__init__.py` documents the test layout.
 
 ## Fixing “Not Found” in folder chat
 
@@ -30,7 +58,7 @@ Check the running gateway from a second PowerShell window:
 Invoke-RestMethod 'http://127.0.0.1:8787/' | Select-Object server_version, capabilities
 ```
 
-Expect `2.1.1`, `workspace_chat`, and `workspace_apply`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
+Expect `2.2.0`, `workspace_chat`, and `workspace_apply`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
 
 ## Desk 2.1 UI update
 
@@ -265,7 +293,7 @@ The Files tab reads and writes only the configured folders. A blank `ALLOWED_ROO
 ALLOWED_ROOTS=
 MAX_UPLOAD_MB=200
 MAX_TEXT_BYTES=1000000
-CODER_MODEL=qwen2.5-coder:14b
+CODER_MODEL=ornith-1.5:9b
 ```
 
 Add the folders you actually want to work on, separated by semicolons, then restart Desk:
@@ -287,23 +315,23 @@ On the phone:
 7. Delete moves the item to a `.trash` folder on that drive. It is not a permanent delete.
 8. Download saves a PC file onto the phone.
 
-Code files use `qwen2.5-coder:14b` when `ollama list` has it, and `DEFAULT_MODEL` otherwise. A file that is too big for the model's context can still be edited by hand. The screen says when the PC is offline, the API key was rejected, the file is too large, or the path is outside the allowed drives.
+Code files use `CODER_MODEL` (now `ornith-1.5:9b` by default) when `ollama list` has it, and `DEFAULT_MODEL` otherwise. A file that is too big for the model's context can still be edited by hand. The screen says when the PC is offline, the API key was rejected, the file is too large, or the path is outside the allowed drives.
 
 ## Work on a whole folder in chat
 
 1. Add your project folder to `ALLOWED_ROOTS` as above and restart the PC gateway.
 2. On the phone, open **Files**, navigate into the folder, and tap **Chat with this folder**. You can also use the attach button inside a chat and choose **Use this folder**.
 3. Ask a question or request changes across files, for example: “Explain how this project starts” or “Update the API response and its Android client together.” The folder remains attached for follow-up messages and is remembered with the conversation.
-4. Tap the coverage card to see which files the model received. Each question rescans subfolders and ranks text files by the question. Mention a specific relative path to focus the next response, or select a smaller subfolder.
+4. Tap the coverage card to see which files the model received. Each question rescans subfolders and ranks text files by the question. The model receives relevant complete files or line excerpts. The project index stays attached; tap a path to prepare a focused follow-up without selecting a smaller folder.
 5. When the model proposes edits, tap **Review changes**. Review each file's diff or complete new contents, then **Save all changes**. Chat alone never writes files.
 
 Folder chat can replace multiple existing text files and create new text files, including subdirectories. It does not execute commands, install packages, delete files, or rename files. Saves check the original contents first, refuse stale proposals, and write `.bak` copies for existing files. A failed multi-file save attempts to restore files already written; this is not an atomic transaction against PC crashes or simultaneous external file edits. Proposals expire after 30 minutes or a server restart; ask again if one expires. A repeated save of the same completed proposal does not write twice.
 
-Context is bounded: up to 1,000 indexed text files, 10,000 scanned entries, 2 MB of source read per request, 100 KB per source file, and a smaller selection fitted to the model context. The UI reports omitted/skipped files and capped listings. The entire folder does not have to fit in the model at once. Folder chat uses at least an 8,192-token context, so it may use more GPU memory than ordinary chat. `NUM_CTX` can raise this up to 32,768, subject to model/GPU limits. Token budgeting is approximate; smaller folders or fewer changed files work best on a 7B model.
+Project scanning and model context have separate bounds: up to 20,000 indexed text files, 100,000 scanned entries, 16 MB of source read per request, and 1 MB per source file (or the smaller configured text limit). Up to 16 relevant files are included per reply, using excerpts when necessary. The phone gets a path preview of up to 256,000 characters; the model gets a compact directory map plus bounded source context. A shortened preview is not a failed scan. The UI distinguishes complete scans, actual scan limits, content-reading limits, and files simply not used in this reply. Hidden/dependency exclusions still apply. Folder chat uses at least 8,192 tokens; `NUM_CTX` can raise this up to 32,768 subject to model/GPU limits. Prompt budgeting reserves space for history, system instructions, the index and output; character-based token estimates remain approximate.
 
 Hidden files/folders, common dependency/build folders, signing material and common credential filenames are excluded. Add a `.deskignore` file at the workspace root for extra glob patterns, one per line, such as `data/*` or `*.log`. Comments start with `#`; rules are exclusion-only, not full gitignore syntax. File contents are sent only to the configured Ollama endpoint. Arbitrarily named files can still contain secrets: choose appropriate workspace roots and ignore rules.
 
-The model's proposal format is one fenced `desk-changes` JSON array containing objects with relative `path` and complete `content`, or `replacements` with exact unique `old`/`new` text for existing files. Exact replacements let the model change several files without regenerating all their unchanged text. Invalid or incomplete proposals cannot be saved. At most 12 changed files are accepted per proposal. A file omitted from context cannot be overwritten; ask again mentioning its path.
+The model's proposal format is one fenced `desk-changes` JSON array containing objects with relative `path` and complete `content`, or `replacements` with exact unique `old`/`new` text for existing files. Exact replacements let the model change several files without regenerating all their unchanged text. Invalid or incomplete proposals cannot be saved. At most 12 changed files are accepted per proposal. A file omitted from context cannot be overwritten; ask again mentioning its path. An excerpted file accepts exact replacements only, and the old text must have been visible in an excerpt and unique in the original. Unseen lines are preserved. Complete rewrites of excerpts are rejected. Individual changed files are limited to 1 MB and combined stored before/after text to 2 MB per proposal.
 
 ## Change the model
 

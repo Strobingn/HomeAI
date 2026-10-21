@@ -128,6 +128,10 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
                 }
             }
             _state.update { it.copy(testing = false, status = status) }
+            if (status.ok && !status.model.isNullOrBlank()) {
+                graph.settings.saveModel(status.model)
+                _state.update { it.copy(selectedModel = status.model, manualModel = status.model) }
+            }
             if (status.listModels) {
                 refreshModels()
             }

@@ -20,6 +20,7 @@ data class DeskStatus(
     val headline: String,
     val detail: String,
     val listModels: Boolean = false,
+    val model: String? = null,
 )
 
 fun interpretHealth(health: HealthDto): DeskStatus {
@@ -44,11 +45,11 @@ fun interpretHealth(health: HealthDto): DeskStatus {
             null -> "Connected · check PC version"
         }
         return DeskStatus(ok = true, headline = headline,
-            detail = "$detail\n\n$compatibility", listModels = true)
+            detail = "$detail\n\n$compatibility", listModels = true, model = health.model)
     }
     val detail = health.detail?.takeIf { it.isNotBlank() }
         ?: "The server answered, but the model is not ready."
     val headline = if (health.ollama == "up") "The model is not ready" else "Ollama is not running"
-    return DeskStatus(ok = false, headline = headline, detail = "$detail\n\n$compatibility", listModels = true)
+    return DeskStatus(ok = false, headline = headline, detail = "$detail\n\n$compatibility", listModels = true, model = health.model)
 }
 

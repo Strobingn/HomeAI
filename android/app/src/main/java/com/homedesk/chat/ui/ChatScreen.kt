@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
@@ -157,27 +158,54 @@ fun ChatScreen(
         onDismissRequest = { showContext = false },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
+        var showProjectIndex by remember { mutableStateOf(false) }
+        var contextSearch by remember { mutableStateOf("") }
+        val report = state.context
+        val contextPaths = (if (showProjectIndex) report?.tree.orEmpty() else report?.files.orEmpty())
+            .filter { it.contains(contextSearch, ignoreCase = true) }
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp), contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Text("Project context", style = MaterialTheme.typography.headlineMedium)
                 Text(state.workspace.orEmpty(), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall)
             }
-            val report = state.context
             item {
                 if (report == null) Text("Send a message to see which files Desk reads.")
                 else {
-                    Text("${report.files.size} files read · ${report.omitted} omitted · ${report.skipped} skipped",
+                    Text("${report.indexed} files indexed · ${report.files.size} used in this reply",
                         style = MaterialTheme.typography.titleSmall)
-                    if (report.truncated) InlineNotice("The folder listing was capped. Choose a smaller subfolder or name the file you need.")
+                    Text("${report.partial.size} excerpts · ${report.omitted} not used in this reply · ${report.skipped} skipped",
+                        style = MaterialTheme.typography.bodySmall)
+                    InlineNotice(when (report.scanComplete) {
+                        true -> "Project index complete. Desk retrieves relevant files for each question while the whole folder stays attached."
+                        false -> "The folder scan reached a limit or an unreadable directory. Some paths are missing from this index."
+                        null -> "Update and restart the PC gateway to get complete project indexing and source excerpts."
+                    })
+                    if (report.readLimited) Text("Some file contents exceeded the reading limits. Indexed filenames do not mean every file was read.",
+                        style = MaterialTheme.typography.bodySmall)
+                    if (report.treeLimited) Text("This path preview is shortened; the PC searches the larger index for each question.",
+                        style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !showProjectIndex, onClick = { showProjectIndex = false }, label = { Text("Used in reply") })
+                        FilterChip(selected = showProjectIndex, onClick = { showProjectIndex = true }, label = { Text("Project index") })
+                    }
+                    OutlinedTextField(value = contextSearch, onValueChange = { contextSearch = it },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Find a file") }, singleLine = true)
+                    Text("Tap a file to prepare a focused question.", style = MaterialTheme.typography.bodySmall)
                 }
                 TextButton(onClick = { showContext = false; onAttach() }, enabled = !state.sending && !state.applying) {
                     Text("Choose another folder")
                 }
                 HorizontalDivider()
             }
-            items(report?.files.orEmpty(), key = { it }) { path ->
-                Text(path, style = MaterialTheme.typography.bodyMedium)
+            items(contextPaths, key = { it }) { path ->
+                TextButton(onClick = { viewModel.onDraft("Inspect $path and explain the relevant code."); showContext = false },
+                    enabled = !state.sending && !state.applying) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(path, style = MaterialTheme.typography.bodyMedium)
+                        if (path in report?.partial.orEmpty()) Text("Relevant excerpt", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
             item { Spacer(Modifier.height(24.dp)) }
         }

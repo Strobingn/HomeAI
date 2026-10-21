@@ -2,6 +2,7 @@ package com.homedesk.chat.net
 
 import com.homedesk.chat.data.OutboundMessage
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -24,6 +25,12 @@ data class WorkspaceContext(
     val omitted: Int = 0,
     val skipped: Int = 0,
     val truncated: Boolean = false,
+    val tree: List<String> = emptyList(),
+    val searched: Int = 0,
+    val partial: List<String> = emptyList(),
+    @SerialName("scan_complete") val scanComplete: Boolean? = null,
+    @SerialName("tree_limited") val treeLimited: Boolean = false,
+    @SerialName("read_limited") val readLimited: Boolean = false,
 )
 
 @Serializable

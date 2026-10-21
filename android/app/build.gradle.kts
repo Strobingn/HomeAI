@@ -15,8 +15,8 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.1.1"
+        versionCode = 8
+        versionName = "2.2.0"
         manifestPlaceholders["appLabel"] = "Desk"
     }
 
@@ -46,7 +46,8 @@ android {
         }
         release {
             if (hasReleaseSigning) signingConfig = signingConfigs.getByName("privateRelease")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

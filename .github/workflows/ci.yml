@@ -53,14 +53,14 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build development APK
         working-directory: android
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon assembleDebug :app:minifyReleaseWithR8
       - name: Optional Android tests and lint
         if: github.event_name == 'workflow_dispatch' && inputs.run_checks
         working-directory: android
         run: gradle --no-daemon testDebugUnitTest lintDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Desk-Dev-2.1.1-${{ github.run_number }}
+          name: Desk-Dev-2.2.0-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -105,7 +105,7 @@ jobs:
         run: gradle --no-daemon assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: Desk-Release-2.1.1
+          name: Desk-Release-2.2.0
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
       - name: Remove restored key

@@ -2,4 +2,7 @@
 <resources>
     <color name="window_background">#F5F5F5</color>
     <color name="ic_launcher_background">#2A2A2A</color>
+    <color name="system_bar_background">#FFFFFF</color>
+    <bool name="light_system_bars">true</bool>
 </resources>
+
