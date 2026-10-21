@@ -1,4 +1,4 @@
-# Desk
+# Desk 2.0
 
 Desk is a chat app for your phone. The model runs on your desktop PC, on the NVIDIA GPU you already have. The phone only shows the conversation.
 
@@ -7,6 +7,10 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 ```
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
+
+## Desk 2.0 Android interface
+
+Version **2.0.0**, build **5**, adds a redesigned home dashboard, grayscale dark/light surfaces, dedicated workspace entry points, searchable folder and conversation lists, formatted chat with selectable text and copyable code blocks, and a full-screen multi-file review. Settings shows the installed version, build number, and app identity. Large chat views keep a comfortable reading width.
 
 ## Get the code
 
@@ -118,9 +122,9 @@ All future release builds must use this same private identity. A newer versionCo
 
 ### GitHub APK builds
 
-Every push and pull request runs server tests on Windows and Linux, Android unit tests and lint, and uploads a **Desk Dev** APK under the workflow's artifacts. Open [Actions](https://github.com/Strobingn/HomeAI/actions), select the branch run, then download its Desk Dev artifact.
+Every push builds and uploads a **Desk Dev** APK under the workflow's artifacts. Automatic runs skip tests and lint. A manual run can optionally enable server/Android tests and lint with **run_checks**; pull requests do not trigger duplicate builds. Open [Actions](https://github.com/Strobingn/HomeAI/actions), select the branch run, then download its Desk Dev artifact.
 
-For privately signed release APKs, configure these [repository Actions secrets](https://github.com/Strobingn/HomeAI/settings/secrets/actions): `DESK_KEYSTORE_BASE64` (base64 of your private keystore), `DESK_STORE_PASSWORD`, `DESK_KEY_ALIAS`, and `DESK_KEY_PASSWORD` (values from your private properties file). Then manually run **Test and build Desk** on the desired branch. The release job requires these secrets and removes its temporary key afterward. Secrets cannot be configured through the connected repository API used for this change.
+For privately signed release APKs, configure these [repository Actions secrets](https://github.com/Strobingn/HomeAI/settings/secrets/actions): `DESK_KEYSTORE_BASE64` (base64 of your private keystore), `DESK_STORE_PASSWORD`, `DESK_KEY_ALIAS`, and `DESK_KEY_PASSWORD` (values from your private properties file). Then manually run **Build Desk APK** on the desired branch with **build_release** enabled. The release job requires these secrets and removes its temporary key afterward. Secrets cannot be configured through the connected repository API used for this change.
 
 ## 4. Connect the phone
 
@@ -261,7 +265,7 @@ Context is bounded: up to 1,000 indexed text files, 10,000 scanned entries, 2 MB
 
 Hidden files/folders, common dependency/build folders, signing material and common credential filenames are excluded. Add a `.deskignore` file at the workspace root for extra glob patterns, one per line, such as `data/*` or `*.log`. Comments start with `#`; rules are exclusion-only, not full gitignore syntax. File contents are sent only to the configured Ollama endpoint. Arbitrarily named files can still contain secrets: choose appropriate workspace roots and ignore rules.
 
-The model's proposal format is one fenced `desk-changes` JSON array containing objects with relative `path` and complete `content`. Invalid or incomplete proposals cannot be saved. At most 12 changed files are accepted per proposal. A file omitted from context cannot be overwritten; ask again mentioning its path.
+The model's proposal format is one fenced `desk-changes` JSON array containing objects with relative `path` and complete `content`, or `replacements` with exact unique `old`/`new` text for existing files. Exact replacements let the model change several files without regenerating all their unchanged text. Invalid or incomplete proposals cannot be saved. At most 12 changed files are accepted per proposal. A file omitted from context cannot be overwritten; ask again mentioning its path.
 
 ## Change the model
 

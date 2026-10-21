@@ -22,6 +22,10 @@ class SettingsStore(context: Context) {
         )
     }
 
+    fun saveModel(model: String) {
+        prefs.edit().putString(MODEL, model.trim().ifBlank { DeskDefaults.MODEL }).apply()
+    }
+
     fun save(settings: DeskSettings) {
         val model = settings.model.trim().ifBlank { DeskDefaults.MODEL }
         prefs.edit()

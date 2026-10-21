@@ -176,7 +176,8 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
             return
         }
         _state.update { it.copy(selectedModel = clean, manualModel = clean) }
-        save()
+        graph.settings.saveModel(clean)
+        if (_state.value.baseUrl.isNotBlank() && _state.value.apiKey.isNotBlank()) save()
         val settings = graph.settings.get()
         if (!settings.isReady) {
             _state.update { it.copy(modelsMessage = "$clean is saved on this phone. Connect to the PC to load it.") }

@@ -180,3 +180,27 @@ def test_health_checks_are_concurrent_and_have_overall_deadline(tmp_path: Path):
         response = client.get("/health", headers=AUTH)
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+
+
+def test_exact_replacements_preserve_unchanged_file_contents(tmp_path: Path):
+    root, service, snap = project(tmp_path)
+    store = WorkspaceStore()
+    proposal = store.add(snap, reply([
+        {"path": "a.py", "replacements": [{"old": "'old'", "new": "'new'"}]},
+        {"path": "b.txt", "replacements": [{"old": "old b", "new": "new b"}]},
+    ]))
+    store.apply(proposal["id"], service)
+    assert (root / "a.py").read_text() == "print('new')\n"
+    assert (root / "b.txt").read_text() == "new b\n"
+
+
+def test_ambiguous_or_missing_replacement_cannot_be_saved(tmp_path: Path):
+    root, _, snap = project(tmp_path)
+    (root / "repeat.txt").write_text("repeat repeat")
+    snap.selected["repeat.txt"] = "repeat repeat"
+    for old in ["repeat", "missing", ""]:
+        with pytest.raises(FileAccessError):
+            WorkspaceStore().add(snap, reply([
+                {"path": "repeat.txt", "replacements": [{"old": old, "new": "bad"}]},
+            ]))
+    assert (root / "repeat.txt").read_text() == "repeat repeat"

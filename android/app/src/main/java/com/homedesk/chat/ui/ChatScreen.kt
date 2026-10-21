@@ -23,6 +23,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,6 +88,7 @@ fun ChatScreen(
     var manual by remember(state.model) { mutableStateOf(state.model) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val owner = LocalLifecycleOwner.current
+    val widePadding = ((LocalConfiguration.current.screenWidthDp - 840) / 2).coerceAtLeast(0).dp
     DisposableEffect(owner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -133,7 +144,7 @@ fun ChatScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             FieldTopBar(
-                title = if (state.title == "New chat") "Chat" else state.title,
+                title = if (state.workspace != null) "Workspace chat" else if (state.title == "New chat") "New conversation" else state.title,
                 onBack = onBack,
                 actions = {
                     TextButton(
@@ -156,7 +167,7 @@ fun ChatScreen(
             Column(
                 modifier = Modifier
                     .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp + widePadding, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val banner = state.banner
@@ -170,10 +181,18 @@ fun ChatScreen(
                     }
                 }
                 state.workspace?.let { folder ->
-                    FieldCard(onClick = { if (!state.sending && !state.applying) viewModel.setWorkspace(null) }) {
-                        Text("Folder workspace: ${pcFileName(folder)}", style = MaterialTheme.typography.labelLarge)
-                        Text(folder, style = MaterialTheme.typography.bodySmall)
-                        Text("Used on every message. Tap to disconnect.", style = MaterialTheme.typography.bodySmall)
+                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.FolderOpen, null)
+                            Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Text(pcFileName(folder), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                                Text(state.context?.let { "${it.files.size} files in context · ${it.omitted} omitted" }
+                                    ?: "Folder stays attached to this conversation", style = MaterialTheme.typography.bodySmall)
+                            }
+                            IconButton(onClick = { viewModel.setWorkspace(null) }, enabled = !state.sending && !state.applying) {
+                                Icon(Icons.Filled.Close, "Disconnect folder")
+                            }
+                        }
                     }
                 }
                 val attached = state.attachedPath
@@ -210,7 +229,7 @@ fun ChatScreen(
                         value = state.draft,
                         onValueChange = viewModel::onDraft,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Message") },
+                        placeholder = { Text(if (state.workspace != null) "Ask about this folder…" else "Message your home AI…") },
                         maxLines = 6,
                         shape = FieldShapes.search,
                     )
@@ -249,7 +268,7 @@ fun ChatScreen(
             }
             else -> {
                 LazyColumn(
-                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    modifier = Modifier.padding(padding).padding(horizontal = widePadding).fillMaxSize(),
                     reverseLayout = true,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -271,6 +290,7 @@ fun ChatScreen(
                         MessageRow(
                             message = message,
                             pending = message.id == state.streamingId && message.content.isEmpty(),
+                            streaming = message.id == state.streamingId,
                             onReview = viewModel::review,
                         )
                     }
@@ -281,8 +301,9 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageRow(message: ChatMessage, pending: Boolean, onReview: (WorkspaceProposal) -> Unit) {
+private fun MessageRow(message: ChatMessage, pending: Boolean, streaming: Boolean, onReview: (WorkspaceProposal) -> Unit) {
     val isUser = message.role == "user"
+    val clipboard = LocalClipboardManager.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -302,11 +323,13 @@ private fun MessageRow(message: ChatMessage, pending: Boolean, onReview: (Worksp
             }
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Desk",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("DESK", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!streaming && message.content.isNotBlank()) IconButton(onClick = {
+                        clipboard.setText(AnnotatedString(message.content))
+                    }) { Icon(Icons.Filled.ContentCopy, "Copy response") }
+                }
                 message.proposal?.let { proposal ->
                     FieldCard {
                         Text(if (message.applied) "Changes saved" else "${proposal.changes.size} file changes proposed")
@@ -314,19 +337,12 @@ private fun MessageRow(message: ChatMessage, pending: Boolean, onReview: (Worksp
                         if (!message.applied) TextButton(onClick = { onReview(proposal) }) { Text("Review changes") }
                     }
                 }
-                Text(
-                    text = when {
-                        pending -> "Working…"
-                        else -> message.content
-                    },
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = when {
-                        message.error -> MaterialTheme.colorScheme.error
-                        pending -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onBackground
-                    },
-                )
+                if (pending) Text("Thinking…", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else ChatMarkdown(message.content.substringBefore("```desk-changes"), Modifier.padding(top = 4.dp))
+                if (streaming && "```desk-changes" in message.content) Text("Preparing file changes…",
+                    Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.bodyMedium)
+
             }
         }
     }
@@ -343,13 +359,16 @@ private fun WorkspaceReview(
     onDismiss: () -> Unit,
     onApply: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).windowInsetsPadding(WindowInsets.navigationBars)) {
-            Text("Review folder changes", style = MaterialTheme.typography.headlineSmall)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false,
+        dismissOnBackPress = !applying, dismissOnClickOutside = false)) {
+      Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)) {
+            FieldTopBar("Review changes", onBack = onDismiss)
+            Text("${proposal.changes.size} files ready for review", style = MaterialTheme.typography.headlineSmall)
             Text("Save writes all ${proposal.changes.size} files. Existing files get .bak copies. Changed source files are rejected.",
                 style = MaterialTheme.typography.bodySmall)
             if (!error.isNullOrBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-            LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 480.dp),
+            LazyColumn(Modifier.weight(1f).padding(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(proposal.changes, key = { it.path }) { change ->
                     var full by remember { mutableStateOf(false) }
@@ -370,7 +389,8 @@ private fun WorkspaceReview(
             }
             DeskButton(text = if (applying) "Saving…" else "Save all changes", onClick = onApply,
                 enabled = !applying && canApply, modifier = Modifier.fillMaxWidth())
-            TextButton(onClick = onDismiss, enabled = !applying) { Text("Keep reviewing later") }
+            TextButton(onClick = onDismiss, enabled = !applying) { Text("Back to conversation") }
         }
     }
+}
 }

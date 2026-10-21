@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,13 +19,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -49,6 +56,9 @@ fun ChatsScreen(
     )
     val items by viewModel.items.collectAsStateWithLifecycle()
     val pending by viewModel.pendingDelete.collectAsStateWithLifecycle()
+    var search by remember { mutableStateOf("") }
+    var workspacesOnly by remember { mutableStateOf(false) }
+    val visible = items.filter { it.title.contains(search, ignoreCase = true) && (!workspacesOnly || it.workspace != null) }
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) { viewModel.reload() }
     DisposableEffect(owner) {
@@ -103,7 +113,16 @@ fun ChatsScreen(
                 contentPadding = PaddingValues(FieldMetrics.screenPadding),
                 verticalArrangement = Arrangement.spacedBy(FieldMetrics.space12),
             ) {
-                items(items, key = { it.id }) { conversation ->
+                item {
+                    Text("${items.size} conversations", style = MaterialTheme.typography.headlineSmall)
+                    OutlinedTextField(value = search, onValueChange = { search = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp), singleLine = true,
+                        placeholder = { Text("Search conversations") }, shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                    FilterChip(selected = workspacesOnly, onClick = { workspacesOnly = !workspacesOnly },
+                        label = { Text("Folder workspaces") })
+                    if (visible.isEmpty()) Text("No matching conversations", style = MaterialTheme.typography.bodyMedium)
+                }
+                items(visible, key = { it.id }) { conversation ->
                     FieldCard(onClick = { onOpenChat(conversation.id) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -122,6 +141,10 @@ fun ChatsScreen(
                             IconButton(onClick = { viewModel.askDelete(conversation) }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Delete chat")
                             }
+                        }
+                        conversation.workspace?.let { folder ->
+                            Text("Workspace · ${com.homedesk.chat.data.pcFileName(folder)}",
+                                modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelMedium)
                         }
                         val preview = conversation.messages.lastOrNull()?.content
                             ?.replace('\n', ' ')
@@ -153,3 +176,4 @@ private fun formatWhen(epochMs: Long): String {
         else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(epochMs))
     }
 }
+

@@ -15,8 +15,8 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "2.0.0"
         manifestPlaceholders["appLabel"] = "Desk"
     }
 
@@ -67,6 +67,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

@@ -35,7 +35,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("home", "Home", Icons.Filled.Home),
     Tab("chats", "Chats", Icons.AutoMirrored.Filled.Chat),
-    Tab("files", "Files", Icons.Filled.Folder),
+    Tab("files", "Workspace", Icons.Filled.Folder),
     Tab("settings", "Settings", Icons.Filled.Settings),
 )
 
@@ -72,6 +72,7 @@ fun DeskNav() {
                     nav.navigate("settings") { launchSingleTop = true }
                 },
                 onNewChat = ::openNewChat,
+                onOpenFiles = { nav.navigate("files") { launchSingleTop = true } },
                 onOpenChat = { id -> nav.navigate("chat/$id") },
                 bottomBar = bar,
             )

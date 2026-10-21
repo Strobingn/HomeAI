@@ -212,7 +212,7 @@ def create_app(
         )
     app = FastAPI(
         title="Home Desk",
-        version="1.0.0",
+        version="2.0.0",
         description="Streams a local Ollama model to the Desk phone app.",
         lifespan=lifespan,
     )

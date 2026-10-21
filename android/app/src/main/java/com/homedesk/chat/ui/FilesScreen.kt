@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -33,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +80,12 @@ fun FilesScreen(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var search by remember(state.path) { mutableStateOf("") }
+    var filter by remember(state.path) { mutableStateOf("All") }
+    val visibleEntries = state.entries.filter {
+        it.name.contains(search, ignoreCase = true) && (filter == "All" ||
+            (filter == "Folders" && it.kind == "dir") || (filter == "Text" && it.text))
+    }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -186,7 +194,7 @@ fun FilesScreen(
 
     val title = when {
         picking -> "Choose file or folder"
-        else -> state.title
+        else -> if (state.atRoots) "Workspace" else state.title
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -248,6 +256,21 @@ fun FilesScreen(
                         contentPadding = PaddingValues(FieldMetrics.screenPadding),
                         verticalArrangement = Arrangement.spacedBy(FieldMetrics.space12),
                     ) {
+                        item {
+                            Text(if (state.atRoots) "Choose a project" else "${state.entries.size} items",
+                                style = MaterialTheme.typography.headlineSmall)
+                            Text(state.path ?: "Your folders on the desktop", Modifier.padding(top = 4.dp),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedTextField(value = search, onValueChange = { search = it },
+                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp), singleLine = true,
+                                placeholder = { Text("Search this folder") },
+                                leadingIcon = { Icon(Icons.Filled.Search, null) }, shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                            if (!state.atRoots) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("All", "Folders", "Text").forEach { label ->
+                                    FilterChip(selected = filter == label, onClick = { filter = label }, label = { Text(label) })
+                                }
+                            }
+                        }
                         if (!state.path.isNullOrBlank() && !state.loading && state.error == null) {
                             val folder = state.path.orEmpty()
                             val action = if (picking) onPickedFolder else onFolderChat
@@ -373,7 +396,7 @@ fun FilesScreen(
                                     )
                                 }
                             }
-                            items(state.roots, key = { it.path }) { root ->
+                            items(state.roots.filter { (it.label + it.path).contains(search, ignoreCase = true) }, key = { it.path }) { root ->
                                 RootRow(root = root, onClick = { viewModel.openRoot(root) })
                             }
                         } else {
@@ -386,15 +409,15 @@ fun FilesScreen(
                                     )
                                 }
                             }
-                            if (!state.loading && state.entries.isEmpty()) {
+                            if (!state.loading && visibleEntries.isEmpty()) {
                                 item {
                                     EmptyHint(
-                                        title = "This folder is empty",
-                                        body = "Upload a file from the phone, or create a folder.",
+                                        title = if (search.isNotBlank() || filter != "All") "No matching files" else "This folder is empty",
+                                        body = if (search.isNotBlank() || filter != "All") "Try a different search or filter." else "Upload a file from the phone, or create a folder.",
                                     )
                                 }
                             }
-                            items(state.entries, key = { it.path }) { entry ->
+                            items(visibleEntries, key = { it.path }) { entry ->
                                 EntryRow(
                                     entry = entry,
                                     onClick = {

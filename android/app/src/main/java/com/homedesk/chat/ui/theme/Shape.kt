@@ -13,9 +13,9 @@ val AppShapes = Shapes(
 )
 
 object FieldShapes {
-    val card = RoundedCornerShape(20.dp)
+    val card = RoundedCornerShape(24.dp)
     val chip = RoundedCornerShape(100.dp)
-    val button = RoundedCornerShape(14.dp)
+    val button = RoundedCornerShape(18.dp)
     val search = RoundedCornerShape(16.dp)
     val bottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 }
@@ -30,3 +30,4 @@ object FieldMetrics {
     val primaryTouch = 56.dp
     val screenPadding = 16.dp
 }
+

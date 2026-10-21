@@ -18,7 +18,7 @@ import androidx.core.view.WindowCompat
 /**
  * Greyscale chrome from Wildlife FieldOps: near-black pages, lifted cards,
  * light-gray primary in the dark theme, dark-gray primary in the light theme.
- * Red and green stay reserved for errors and success.
+ * Status is conveyed with labels and icons; every surface stays grayscale.
  */
 data class DeskChrome(
     val navBar: Color,
@@ -29,19 +29,19 @@ data class DeskChrome(
 )
 
 private val DarkChrome = DeskChrome(
-    navBar = Color(0xFF2A2A2A),
+    navBar = Color(0xFF171717),
     navIndicator = Color(0xFF4A4A4A),
     navSelected = Color(0xFFF5F5F5),
     navUnselected = Color(0xFFBDBDBD),
-    success = Color(0xFF81C784),
+    success = Color(0xFF999999),
 )
 
 private val LightChrome = DeskChrome(
     navBar = Color(0xFFEEEEEE),
     navIndicator = Color(0xFFE0E0E0),
-    navSelected = Color(0xFF1A1C1E),
-    navUnselected = Color(0xFF44474F),
-    success = Color(0xFF1B5E20),
+    navSelected = Color(0xFF1C1C1C),
+    navUnselected = Color(0xFF494949),
+    success = Color(0xFF333333),
 )
 
 val LocalChrome = staticCompositionLocalOf { DarkChrome }
@@ -57,7 +57,7 @@ private val DarkColors = darkColorScheme(
     onSecondaryContainer = Color(0xFF111111),
     tertiary = Color(0xFFE0E0E0),
     onTertiary = Color(0xFF111111),
-    background = Color(0xFF121212),
+    background = Color(0xFF101010),
     onBackground = Color(0xFFF5F5F5),
     surface = Color(0xFF2C2C2C),
     onSurface = Color(0xFFF5F5F5),
@@ -66,14 +66,14 @@ private val DarkColors = darkColorScheme(
     surfaceBright = Color(0xFF404040),
     surfaceDim = Color(0xFF2A2A2A),
     surfaceContainerLowest = Color(0xFF121212),
-    surfaceContainerLow = Color(0xFF333333),
+    surfaceContainerLow = Color(0xFF1B1B1B),
     surfaceContainer = Color(0xFF2C2C2C),
     surfaceContainerHigh = Color(0xFF333333),
     surfaceContainerHighest = Color(0xFF404040),
-    error = Color(0xFFFFB4B4),
-    onError = Color(0xFF3B0002),
-    errorContainer = Color(0xFF5C1A1A),
-    onErrorContainer = Color(0xFFFFDAD6),
+    error = Color(0xFFCDCDCD),
+    onError = Color(0xFF141414),
+    errorContainer = Color(0xFF303030),
+    onErrorContainer = Color(0xFFE5E5E5),
     outline = Color(0xFF666666),
     outlineVariant = Color(0xFF666666),
     scrim = Color(0xCC000000),
@@ -94,11 +94,11 @@ private val LightColors = lightColorScheme(
     tertiary = Color(0xFF2E2E2E),
     onTertiary = Color(0xFFFFFFFF),
     background = Color(0xFFF5F5F5),
-    onBackground = Color(0xFF1A1C1E),
+    onBackground = Color(0xFF1C1C1C),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1A1C1E),
+    onSurface = Color(0xFF1C1C1C),
     surfaceVariant = Color(0xFFE6E6E6),
-    onSurfaceVariant = Color(0xFF44474F),
+    onSurfaceVariant = Color(0xFF494949),
     surfaceBright = Color(0xFFFFFFFF),
     surfaceDim = Color(0xFFEEEEEE),
     surfaceContainerLowest = Color(0xFFFFFFFF),
@@ -106,15 +106,15 @@ private val LightColors = lightColorScheme(
     surfaceContainer = Color(0xFFE8E8E8),
     surfaceContainerHigh = Color(0xFFE3E3E3),
     surfaceContainerHighest = Color(0xFFDCDCDC),
-    error = Color(0xFF9B1B1B),
+    error = Color(0xFF464646),
     onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002),
-    outline = Color(0xFF74777F),
+    errorContainer = Color(0xFFE5E5E5),
+    onErrorContainer = Color(0xFF161616),
+    outline = Color(0xFF797979),
     outlineVariant = Color(0xFFC4C4C4),
     scrim = Color(0x66000000),
-    inverseSurface = Color(0xFF2F3133),
-    inverseOnSurface = Color(0xFFF4F6F8),
+    inverseSurface = Color(0xFF313131),
+    inverseOnSurface = Color(0xFFF6F6F6),
     inversePrimary = Color(0xFFD0D0D0),
 )
 
@@ -150,3 +150,4 @@ fun DeskTheme(
         )
     }
 }
+

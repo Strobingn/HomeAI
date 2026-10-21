@@ -63,7 +63,7 @@ class ChatViewModel(
                     title = existing?.title ?: "New chat",
                     model = model,
                     messages = existing?.messages ?: emptyList(),
-                    workspace = existing?.workspace ?: it.workspace,
+                    workspace = it.workspace ?: existing?.workspace,
                 )
             }
         }
@@ -144,8 +144,7 @@ class ChatViewModel(
         val clean = model.trim()
         if (clean.isEmpty()) return
         _state.update { it.copy(model = clean, banner = null) }
-        val current = graph.settings.get()
-        graph.settings.save(current.copy(model = clean))
+        graph.settings.saveModel(clean)
         viewModelScope.launch(Dispatchers.IO) {
             val settings = graph.settings.get()
             if (!settings.isReady) return@launch
@@ -219,7 +218,8 @@ class ChatViewModel(
                             _state.update { state -> state.copy(messages = state.messages.map {
                                 if (it.id == assistantId) it.copy(
                                     proposal = event.proposal,
-                                    content = it.content.replace(Regex("(?s)```desk-changes.*?```"), "").trim(),
+                                    content = it.content.substringBefore("```desk-changes").trim()
+                                        .ifBlank { "Review the proposed file changes below." },
                                 ) else it
                             }) }
                         }

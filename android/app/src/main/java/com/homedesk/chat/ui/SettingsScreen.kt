@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.homedesk.chat.BuildConfig
 import com.homedesk.chat.ui.theme.FieldMetrics
 import com.homedesk.chat.ui.theme.LocalChrome
 
@@ -50,7 +51,13 @@ fun SettingsScreen(bottomBar: @Composable () -> Unit = {}) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(FieldMetrics.space12),
         ) {
-            SectionHeader("Server")
+            FieldCard {
+                Text("Desk ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineMedium)
+                Text("Build ${BuildConfig.VERSION_CODE} · ${if (BuildConfig.DEBUG) "Development" else "Private release"}",
+                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${BuildConfig.APPLICATION_ID}", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall)
+            }
+            SectionHeader("Desktop connection")
             Text(
                 "Type the address from the Desk window on the PC, and the API key from config/.env.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -110,7 +117,7 @@ fun SettingsScreen(bottomBar: @Composable () -> Unit = {}) {
                 }
             }
 
-            SectionHeader("Model")
+            SectionHeader("AI model")
             if (state.loadingModels) {
                 Text(
                     "Loading installed models…",
@@ -135,3 +142,4 @@ fun SettingsScreen(bottomBar: @Composable () -> Unit = {}) {
         }
     }
 }
+
