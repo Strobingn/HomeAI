@@ -6,6 +6,7 @@ import com.homedesk.chat.data.ChatStore
 import com.homedesk.chat.data.SettingsStore
 import com.homedesk.chat.net.DeskApi
 import com.homedesk.chat.net.FilesApi
+import com.homedesk.chat.net.WorkspaceApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +40,7 @@ class AppGraph(val app: Application) {
     val chats = ChatStore(app)
     val api = DeskApi(http)
     val files = FilesApi(http)
+    val workspace = WorkspaceApi(http)
     val share = ShareBus()
     val fileNav = FileNav()
 }
@@ -70,6 +72,13 @@ class ShareBus {
 class FileNav {
     @Volatile var editorPath: String? = null
     @Volatile var chatAttachment: String? = null
+    @Volatile var chatWorkspace: String? = null
+
+    fun consumeWorkspace(): String? {
+        val value = chatWorkspace
+        chatWorkspace = null
+        return value
+    }
 
     fun consumeAttachment(): String? {
         val value = chatAttachment
@@ -77,3 +86,4 @@ class FileNav {
         return value?.takeIf { it.isNotBlank() }
     }
 }
+

@@ -8,6 +8,7 @@ import com.homedesk.chat.data.DeskSettings
 import com.homedesk.chat.net.DeskCallException
 import com.homedesk.chat.net.DeskStatus
 import com.homedesk.chat.net.ModelInfo
+import com.homedesk.chat.net.ServerUrl
 import com.homedesk.chat.net.explainTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +56,13 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
 
     fun save() {
         val snapshot = _state.value
+        try {
+            require(ServerUrl.normalize(snapshot.baseUrl).isNotBlank()) { "Enter the PC's server address." }
+            require(ServerUrl.normalizeKey(snapshot.apiKey).isNotBlank()) { "Enter the API key from config/.env." }
+        } catch (error: IllegalArgumentException) {
+            _state.update { it.copy(status = DeskStatus(ok = false, headline = "Check settings", detail = error.message.orEmpty())) }
+            return
+        }
         graph.settings.save(
             DeskSettings(
                 baseUrl = snapshot.baseUrl,
@@ -70,6 +78,13 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
 
     fun test() {
         val snapshot = _state.value
+        try {
+            require(ServerUrl.normalize(snapshot.baseUrl).isNotBlank()) { "Enter the server address." }
+            require(ServerUrl.normalizeKey(snapshot.apiKey).isNotBlank()) { "Enter the API key." }
+        } catch (error: IllegalArgumentException) {
+            _state.update { it.copy(status = DeskStatus(ok = false, headline = "Check settings", detail = error.message.orEmpty())) }
+            return
+        }
         if (snapshot.baseUrl.isBlank()) {
             _state.update {
                 it.copy(
@@ -179,3 +194,4 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
         }
     }
 }
+

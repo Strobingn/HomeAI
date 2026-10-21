@@ -132,6 +132,7 @@ class FileEditorViewModel(
             try {
                 call.read { event ->
                     when (event) {
+                        is StreamEvent.Context -> Unit
                         is StreamEvent.Token -> _state.update { state ->
                             state.copy(reply = state.reply + event.text)
                         }
@@ -241,3 +242,4 @@ class FileEditorViewModel(
         }
     }
 }
+

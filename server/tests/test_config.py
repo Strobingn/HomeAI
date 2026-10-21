@@ -67,8 +67,8 @@ def test_ensure_env_fills_a_blank_key_once(tmp_path: Path) -> None:
     assert current_api_key((config / ".env").read_text(encoding="utf-8")) == created
 
 
-def test_allowed_roots_default_to_every_drive() -> None:
-    assert parse_allowed_roots(None) == ("ALL",)
+def test_allowed_roots_default_to_home_workspace() -> None:
+    assert parse_allowed_roots(None) == (str(Path.home() / "Desk"),)
     assert parse_allowed_roots("ALL") == ("ALL",)
     assert parse_max_upload_bytes("200") == 200 * 1024 * 1024
     assert parse_max_text_bytes(None) == 1_000_000
@@ -78,7 +78,7 @@ def test_allowed_roots_default_to_every_drive() -> None:
 
 def test_append_file_settings_is_idempotent() -> None:
     once = append_file_settings("API_KEY=abc\n")
-    assert "ALLOWED_ROOTS=ALL" in once
+    assert "ALLOWED_ROOTS=\n" in once
     assert "CODER_MODEL=qwen2.5-coder:14b" in once
     twice = append_file_settings(once)
     assigned = [
@@ -86,7 +86,7 @@ def test_append_file_settings_is_idempotent() -> None:
         for line in twice.splitlines()
         if line.strip().startswith("ALLOWED_ROOTS=")
     ]
-    assert assigned == ["ALLOWED_ROOTS=ALL"]
+    assert assigned == ["ALLOWED_ROOTS="]
 
 
 def test_upsert_key_replaces_only_the_key_line() -> None:
@@ -94,3 +94,4 @@ def test_upsert_key_replaces_only_the_key_line() -> None:
     assert "API_KEY=abc" in text
     assert "PORT=8787" in text
     assert text.startswith("# comment")
+

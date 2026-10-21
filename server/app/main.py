@@ -32,6 +32,7 @@ from app.ollama import (
     build_warm_body,
 )
 from app.state import ModelStore
+from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
 
@@ -111,10 +112,11 @@ async def _health(app: FastAPI) -> HealthOut:
     model = app.state.models.selected
     ollama = app.state.ollama
     try:
-        version = await ollama.version()
-        installed = await ollama.tags()
-        running = await ollama.running_names()
-    except OllamaUnreachable:
+        async with asyncio.timeout(6.0):
+            version, installed, running = await asyncio.gather(
+                ollama.version(), ollama.tags(), ollama.running_names(),
+            )
+    except (OllamaUnreachable, TimeoutError):
         return HealthOut(
             status="degraded",
             ollama="down",
@@ -217,6 +219,7 @@ def create_app(
     app.state.settings = settings
     app.state.ollama = ollama
     app.state.models = ModelStore(settings.state_path, settings.default_model)
+    app.state.workspaces = WorkspaceStore()
     app.state.files = file_service or FileService(
         allowed_roots=settings.allowed_roots,
         max_upload_bytes=settings.max_upload_bytes,
@@ -359,6 +362,7 @@ def create_app(
         )
 
     register_file_routes(app)
+    register_workspace_routes(app)
     return app
 
 
@@ -388,3 +392,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

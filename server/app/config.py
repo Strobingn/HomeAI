@@ -77,17 +77,23 @@ def clean_model(name: str) -> str:
     return text
 
 
+def default_workspace() -> str:
+    return str(Path.home() / "Desk")
+
+
 def parse_allowed_roots(raw: str | None) -> tuple[str, ...]:
     """ALL means every drive. Otherwise a semicolon-separated folder list."""
-    text = "ALL" if raw is None else raw.strip()
-    if not text or text.upper() == "ALL":
+    text = (raw or "").strip()
+    if not text:
+        return (default_workspace(),)
+    if text.upper() == "ALL":
         return ("ALL",)
     parts: list[str] = []
     for piece in text.split(";"):
         item = piece.strip().strip('"').strip("'")
         if item:
             parts.append(item)
-    return tuple(parts) if parts else ("ALL",)
+    return tuple(parts) if parts else (default_workspace(),)
 
 
 def parse_max_upload_bytes(raw: str | None) -> int:
@@ -127,7 +133,7 @@ class Settings:
     warm_on_start: bool
     connect_timeout: float = 2.0
     read_timeout: float = 8.0
-    allowed_roots: tuple[str, ...] = ("ALL",)
+    allowed_roots: tuple[str, ...] = ()
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_MB * 1024 * 1024
     max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES
     coder_model: str = DEFAULT_CODER_MODEL
@@ -184,3 +190,4 @@ class Settings:
             max_text_bytes=parse_max_text_bytes(os.environ.get("MAX_TEXT_BYTES")),
             coder_model=coder_model,
         )
+

@@ -303,13 +303,13 @@ def _os_message(exc: OSError) -> str:
 class FileService:
     def __init__(
         self,
-        allowed_roots: tuple[str, ...] = ("ALL",),
+        allowed_roots: tuple[str, ...] = (),
         *,
         max_upload_bytes: int = 200 * 1024 * 1024,
         max_text_bytes: int = 1_000_000,
         detector: Callable[[], list[Path]] | None = None,
     ) -> None:
-        self.allowed_roots = allowed_roots or ("ALL",)
+        self.allowed_roots = allowed_roots or (str(Path.home() / "Desk"),)
         self.max_upload_bytes = max_upload_bytes
         self.max_text_bytes = max_text_bytes
         self._detector = detector or detect_drives
@@ -880,3 +880,4 @@ def _dedupe(bounds: list[RootBound]) -> list[RootBound]:
         seen.add(bound.resolved)
         kept.append(bound)
     return kept
+

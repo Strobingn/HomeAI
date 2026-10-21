@@ -8,7 +8,7 @@ data class DeskSettings(
     val apiKey: String,
     val model: String,
 ) {
-    val isReady: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank()
+    val isReady: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && runCatching { ServerUrl.normalize(baseUrl); ServerUrl.normalizeKey(apiKey) }.isSuccess
 }
 
 class SettingsStore(context: Context) {
@@ -26,7 +26,7 @@ class SettingsStore(context: Context) {
         val model = settings.model.trim().ifBlank { DeskDefaults.MODEL }
         prefs.edit()
             .putString(URL, ServerUrl.normalize(settings.baseUrl))
-            .putString(KEY, settings.apiKey.trim().trim('"').trim('\''))
+            .putString(KEY, ServerUrl.normalizeKey(settings.apiKey))
             .putString(MODEL, model)
             .commit()
     }
@@ -37,3 +37,4 @@ class SettingsStore(context: Context) {
         const val MODEL = "model"
     }
 }
+

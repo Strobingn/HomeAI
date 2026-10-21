@@ -38,7 +38,7 @@ def upsert_key(text: str, key: str) -> str:
 
 
 _FILE_DEFAULTS = (
-    ("ALLOWED_ROOTS", "ALL"),
+    ("ALLOWED_ROOTS", ""),
     ("MAX_UPLOAD_MB", "200"),
     ("MAX_TEXT_BYTES", "1000000"),
     ("CODER_MODEL", "qwen2.5-coder:14b"),
@@ -65,8 +65,8 @@ def append_file_settings(text: str) -> str:
     if "ALLOWED_ROOTS" not in present:
         lines.extend(
             [
-                "# Files. ALL means every fixed and removable drive, detected each time you browse.",
-                "# To limit Desk later, use semicolon-separated folders:",
+                "# Files. Blank limits access to the Desk folder inside your home folder.",
+                "# To add project folders, use semicolon-separated absolute paths:",
                 r"# ALLOWED_ROOTS=C:\Users\Austin\Desktop;D:\Work",
             ]
         )
@@ -126,3 +126,4 @@ if __name__ == "__main__":
         if exc.code not in (0, None):
             print(exc, file=sys.stderr)
         raise
+

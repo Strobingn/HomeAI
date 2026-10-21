@@ -89,6 +89,10 @@ fun DeskNav() {
                 picking = false,
                 onOpenFile = ::openFile,
                 onPicked = {},
+                onFolderChat = { path ->
+                    graph.fileNav.chatWorkspace = path
+                    openNewChat()
+                },
                 onOpenSettings = {
                     nav.navigate("settings") { launchSingleTop = true }
                 },
@@ -100,6 +104,10 @@ fun DeskNav() {
                 picking = true,
                 acceptShares = false,
                 onOpenFile = {},
+                onPickedFolder = { path ->
+                    graph.fileNav.chatWorkspace = path
+                    nav.popBackStack()
+                },
                 onPicked = { path ->
                     graph.fileNav.chatAttachment = path
                     nav.popBackStack()
@@ -164,3 +172,4 @@ private fun DeskBottomBar(nav: NavHostController) {
         }
     }
 }
+

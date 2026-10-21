@@ -27,7 +27,7 @@ class DeskApi(private val client: OkHttpClient) {
     private val mediaType = "application/json; charset=utf-8".toMediaType()
 
     fun test(baseUrl: String, apiKey: String): DeskStatus {
-        val response = execute(baseUrl, apiKey, "/health", seconds = 8)
+        val response = execute(baseUrl, apiKey, "/health", seconds = 12)
         val health = try {
             json.decodeFromString(HealthDto.serializer(), response)
         } catch (_: Exception) {
@@ -41,7 +41,7 @@ class DeskApi(private val client: OkHttpClient) {
     }
 
     fun listModels(baseUrl: String, apiKey: String): List<ModelInfo> {
-        val response = execute(baseUrl, apiKey, "/models", seconds = 8)
+        val response = execute(baseUrl, apiKey, "/models", seconds = 20)
         val parsed = try {
             json.decodeFromString(ModelsDto.serializer(), response)
         } catch (_: Exception) {
@@ -52,7 +52,7 @@ class DeskApi(private val client: OkHttpClient) {
 
     fun selectModel(baseUrl: String, apiKey: String, model: String) {
         val payload = json.encodeToString(ModelBody.serializer(), ModelBody(model))
-        execute(baseUrl, apiKey, "/model", method = "PUT", body = payload, seconds = 8)
+        execute(baseUrl, apiKey, "/model", method = "PUT", body = payload, seconds = 12)
     }
 
     fun openChat(
@@ -192,3 +192,4 @@ private data class ChatBody(
     val messages: List<OutboundMessage>,
     val file: String? = null,
 )
+

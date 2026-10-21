@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -52,6 +54,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.homedesk.chat.data.ChatMessage
 import com.homedesk.chat.data.pcFileName
+import com.homedesk.chat.data.previewDiff
+import com.homedesk.chat.net.WorkspaceProposal
 import com.homedesk.chat.ui.theme.FieldMetrics
 import com.homedesk.chat.ui.theme.FieldShapes
 
@@ -77,6 +81,7 @@ fun ChatScreen(
     DisposableEffect(owner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                graph.fileNav.consumeWorkspace()?.let(viewModel::setWorkspace)
                 graph.fileNav.consumeAttachment()?.let(viewModel::attach)
             }
         }
@@ -111,6 +116,17 @@ fun ChatScreen(
                 )
             }
         }
+    }
+
+    state.reviewing?.let { proposal ->
+        WorkspaceReview(
+            proposal = proposal,
+            applying = state.applying,
+            canApply = !state.sending,
+            error = state.banner,
+            onDismiss = { if (!state.applying) viewModel.review(null) },
+            onApply = viewModel::applyProposal,
+        )
     }
 
     Scaffold(
@@ -153,6 +169,13 @@ fun ChatScreen(
                         )
                     }
                 }
+                state.workspace?.let { folder ->
+                    FieldCard(onClick = { if (!state.sending && !state.applying) viewModel.setWorkspace(null) }) {
+                        Text("Folder workspace: ${pcFileName(folder)}", style = MaterialTheme.typography.labelLarge)
+                        Text(folder, style = MaterialTheme.typography.bodySmall)
+                        Text("Used on every message. Tap to disconnect.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 val attached = state.attachedPath
                 if (!attached.isNullOrBlank()) {
                     FieldCard(onClick = viewModel::clearAttachment) {
@@ -180,7 +203,7 @@ fun ChatScreen(
                             enabled = state.ready,
                             modifier = Modifier.padding(bottom = 4.dp),
                         ) {
-                            Icon(Icons.Filled.AttachFile, contentDescription = "Attach a file from the PC")
+                            Icon(Icons.Filled.AttachFile, contentDescription = "Choose a PC file or folder")
                         }
                     }
                     OutlinedTextField(
@@ -198,7 +221,7 @@ fun ChatScreen(
                     } else {
                         IconButton(
                             onClick = viewModel::send,
-                            enabled = state.draft.isNotBlank() && state.ready,
+                            enabled = state.draft.isNotBlank() && state.ready && !state.applying,
                             modifier = Modifier.padding(bottom = 4.dp),
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
@@ -231,10 +254,24 @@ fun ChatScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    state.context?.let { report ->
+                        item(key = "workspace-context") {
+                            var expanded by remember { mutableStateOf(false) }
+                            FieldCard(onClick = { expanded = !expanded }) {
+                                Text("Folder context: ${report.files.size} files read · ${report.omitted} omitted · ${report.skipped} skipped",
+                                    style = MaterialTheme.typography.labelLarge)
+                                if (report.truncated) Text("The folder listing was capped. Mention a path to focus the next question.")
+                                if (expanded) Text(report.files.joinToString("\n").ifEmpty { "No file contents fit. Ask about a smaller folder." },
+                                    style = MaterialTheme.typography.bodySmall)
+                                else Text("Tap to see included files", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
                     items(state.messages.asReversed(), key = { it.id }) { message ->
                         MessageRow(
                             message = message,
                             pending = message.id == state.streamingId && message.content.isEmpty(),
+                            onReview = viewModel::review,
                         )
                     }
                 }
@@ -244,7 +281,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageRow(message: ChatMessage, pending: Boolean) {
+private fun MessageRow(message: ChatMessage, pending: Boolean, onReview: (WorkspaceProposal) -> Unit) {
     val isUser = message.role == "user"
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -270,6 +307,13 @@ private fun MessageRow(message: ChatMessage, pending: Boolean) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                message.proposal?.let { proposal ->
+                    FieldCard {
+                        Text(if (message.applied) "Changes saved" else "${proposal.changes.size} file changes proposed")
+                        Text(proposal.changes.joinToString("\n") { it.path }, style = MaterialTheme.typography.bodySmall)
+                        if (!message.applied) TextButton(onClick = { onReview(proposal) }) { Text("Review changes") }
+                    }
+                }
                 Text(
                     text = when {
                         pending -> "Working…"
@@ -284,6 +328,49 @@ private fun MessageRow(message: ChatMessage, pending: Boolean) {
                     },
                 )
             }
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkspaceReview(
+    proposal: WorkspaceProposal,
+    applying: Boolean,
+    canApply: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onApply: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).windowInsetsPadding(WindowInsets.navigationBars)) {
+            Text("Review folder changes", style = MaterialTheme.typography.headlineSmall)
+            Text("Save writes all ${proposal.changes.size} files. Existing files get .bak copies. Changed source files are rejected.",
+                style = MaterialTheme.typography.bodySmall)
+            if (!error.isNullOrBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+            LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(proposal.changes, key = { it.path }) { change ->
+                    var full by remember { mutableStateOf(false) }
+                    val rows = remember(change) { previewDiff(change.before.orEmpty(), change.content) }
+                    FieldCard {
+                        Text((if (change.before == null) "Create: " else "Edit: ") + change.path,
+                            style = MaterialTheme.typography.titleSmall)
+                        TextButton(onClick = { full = !full }) { Text(if (full) "Show diff" else "Show complete result") }
+                        SelectionContainer {
+                            Text(if (full) change.content else rows.take(250).joinToString("\n") {
+                                (when (it.kind) { "add" -> "+ "; "remove" -> "− "; else -> "  " }) + it.text
+                            } + if (rows.size > 250) "\n… Diff truncated; show complete result to inspect all text." else "",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+            DeskButton(text = if (applying) "Saving…" else "Save all changes", onClick = onApply,
+                enabled = !applying && canApply, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = onDismiss, enabled = !applying) { Text("Keep reviewing later") }
         }
     }
 }

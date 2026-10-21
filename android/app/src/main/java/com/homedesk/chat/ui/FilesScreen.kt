@@ -67,6 +67,8 @@ fun FilesScreen(
     onBack: (() -> Unit)? = null,
     bottomBar: @Composable () -> Unit = {},
     acceptShares: Boolean = !picking,
+    onPickedFolder: ((String) -> Unit)? = null,
+    onFolderChat: ((String) -> Unit)? = null,
 ) {
     val graph = LocalGraph.current
     val viewModel: FilesViewModel = viewModel(
@@ -183,7 +185,7 @@ fun FilesScreen(
     }
 
     val title = when {
-        picking -> "Attach a file"
+        picking -> "Choose file or folder"
         else -> state.title
     }
     Scaffold(
@@ -246,10 +248,21 @@ fun FilesScreen(
                         contentPadding = PaddingValues(FieldMetrics.screenPadding),
                         verticalArrangement = Arrangement.spacedBy(FieldMetrics.space12),
                     ) {
+                        if (!state.path.isNullOrBlank() && !state.loading && state.error == null) {
+                            val folder = state.path.orEmpty()
+                            val action = if (picking) onPickedFolder else onFolderChat
+                            if (action != null) item {
+                                DeskButton(
+                                    text = if (picking) "Use this folder" else "Chat with this folder",
+                                    onClick = { action(folder) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
                         if (picking) {
                             item {
                                 Text(
-                                    "Open a drive, then tap a text file. It is added to the chat and is not changed.",
+                                    "Open a folder and choose Use this folder, or tap a text file to attach it once.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -520,3 +533,4 @@ private fun formatModified(epochSeconds: Long?): String? {
     if (epochSeconds == null || epochSeconds <= 0) return null
     return SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(epochSeconds * 1000))
 }
+

@@ -20,3 +20,11 @@ android/.kotlin/
 *.apk
 *.aab
 .DS_Store
+
+
+# Never commit signing material.
+*.keystore
+*.jks
+*.p12
+*.pfx
+**/signing.properties

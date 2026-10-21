@@ -28,9 +28,9 @@ def service_for(root: Path, **kwargs: object) -> FileService:
     return FileService((str(root),), **kwargs)  # type: ignore[arg-type]
 
 
-def test_all_mode_is_the_default_and_can_be_narrowed() -> None:
-    assert parse_allowed_roots(None) == ("ALL",)
-    assert parse_allowed_roots("") == ("ALL",)
+def test_all_mode_requires_explicit_opt_in() -> None:
+    assert parse_allowed_roots(None) == (str(Path.home() / "Desk"),)
+    assert parse_allowed_roots("") == (str(Path.home() / "Desk"),)
     assert parse_allowed_roots(" all ") == ("ALL",)
     assert parse_allowed_roots(r"C:\Users\Austin\Desktop; D:\Work") == (
         r"C:\Users\Austin\Desktop",
@@ -482,3 +482,4 @@ def test_upload_over_the_limit_on_the_api(tmp_path: Path) -> None:
 
 async def _stream(payload: bytes):
     yield payload
+

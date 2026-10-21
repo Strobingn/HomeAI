@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,33 +15,45 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
+        manifestPlaceholders["appLabel"] = "Desk"
     }
 
-    // One keystore in the repo, used on every machine. Android only installs an
-    // update when the signing certificate matches the app already on the phone.
+    // Release credentials live outside the repository; debug has a separate identity.
+    val signingFile = file(System.getenv("DESK_SIGNING_PROPERTIES")
+        ?: "${System.getProperty("user.home")}/.homedesk/signing.properties")
+    val signing = Properties().apply { if (signingFile.isFile) signingFile.inputStream().use { load(it) } }
+    fun signingValue(name: String): String? = System.getenv("DESK_" + name)
+        ?: signing.getProperty(name)
+    val releaseStore = signingValue("STORE_FILE")
+    val hasReleaseSigning = !releaseStore.isNullOrBlank() &&
+        listOf("STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD").all { !signingValue(it).isNullOrBlank() }
     signingConfigs {
-        create("sideload") {
-            storeFile = file("desk-sideload.keystore")
-            storePassword = "desk-sideload"
-            keyAlias = "desk"
-            keyPassword = "desk-sideload"
+        if (hasReleaseSigning) create("privateRelease") {
+            storeFile = file(releaseStore!!)
+            storePassword = signingValue("STORE_PASSWORD")
+            keyAlias = signingValue("KEY_ALIAS")
+            keyPassword = signingValue("KEY_PASSWORD")
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("sideload")
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Desk Dev"
         }
         release {
-            signingConfig = signingConfigs.getByName("sideload")
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("privateRelease")
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+    // Refuse accidental unsigned release packaging. CI always builds Desk Dev,
+    // and builds the installable release only when private secrets are present.
+    tasks.matching { it.name == "validateSigningRelease" || it.name == "packageRelease" }.configureEach {
+        doFirst { check(hasReleaseSigning) { "Run python scripts/setup_signing.py or configure DESK signing secrets first." } }
     }
 
     compileOptions {
@@ -85,3 +99,4 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 }
+

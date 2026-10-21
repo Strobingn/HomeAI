@@ -102,9 +102,25 @@ The APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Copy it to the phone (USB, email to yourself, or a shared folder). Open it. If Android blocks the install, allow installs for the app you used to open the file (Files, Chrome, or Gmail). The app is named **Desk**.
 
-This build is a debug APK. Android may warn that it is from an unknown developer. That is expected.
+The debug APK is **Desk Dev** (`com.homedesk.chat.dev`). It installs alongside Desk so testing does not overwrite your release app or its chats. Debug keys belong to the build machine; APKs from different machines may require reinstalling Desk Dev. Use a privately signed release for dependable updates.
 
-Debug and release builds are signed with `android/app/desk-sideload.keystore`, which is in the repo. The same key is used on every machine, so a newer APK installs over the previous one. If Android says the package conflicts with an existing package, the phone still has an older Desk that was signed with a different key. Uninstall that Desk once (this removes chats and the server URL stored on the phone), then install again. After that, updates install in place. Type the server URL and API key back into Settings.
+### Private release signing (one-time setup)
+
+The old shared signing key was public and is permanently compromised, including copies in Git history. Builds no longer use it. Removing the file from the current branch does not revoke previously signed APKs.
+
+1. Install JDK 17, with `keytool` on PATH.
+2. From the repository root, run `python scripts/setup_signing.py`.
+3. Privately back up the resulting `.homedesk` directory in your home folder. It contains the keystore and `signing.properties`; never commit or share these files.
+4. Run `cd android`, then `gradlew.bat assembleRelease` on Windows or `./gradlew assembleRelease` on Linux.
+5. Install `app/build/outputs/apk/release/app-release.apk`. An old Desk signed with the exposed key needs one uninstall before the first privately signed release. Uninstalling removes on-phone chats and settings. Keep any needed chat content before doing so.
+
+All future release builds must use this same private identity. A newer versionCode then updates in place. Release packaging fails if private signing credentials are missing. For another build machine, securely restore the `.homedesk` directory or set `DESK_SIGNING_PROPERTIES` to its properties file.
+
+### GitHub APK builds
+
+Every push and pull request runs server tests on Windows and Linux, Android unit tests and lint, and uploads a **Desk Dev** APK under the workflow's artifacts. Open [Actions](https://github.com/Strobingn/HomeAI/actions), select the branch run, then download its Desk Dev artifact.
+
+For privately signed release APKs, configure these [repository Actions secrets](https://github.com/Strobingn/HomeAI/settings/secrets/actions): `DESK_KEYSTORE_BASE64` (base64 of your private keystore), `DESK_STORE_PASSWORD`, `DESK_KEY_ALIAS`, and `DESK_KEY_PASSWORD` (values from your private properties file). Then manually run **Test and build Desk** on the desired branch. The release job requires these secrets and removes its temporary key afterward. Secrets cannot be configured through the connected repository API used for this change.
 
 ## 4. Connect the phone
 
@@ -114,7 +130,7 @@ Debug and release builds are signed with `android/app/desk-sideload.keystore`, w
 4. API key: the value after `API_KEY=` in `config/.env`. The Show button reveals what you typed.
 5. Tap **Test connection**.
 
-You want a green **Connected** card, and a line that says `qwen2.5:7b is loaded and ready.` The first test after a reboot can take a few seconds while the model loads into VRAM.
+You want a **Connected** card, and a line that says `qwen2.5:7b is loaded and ready.` The first test after a reboot can take a few seconds while the model loads into VRAM.
 
 Then go Home and tap **New chat**. The reply streams onto the screen. Chats are stored on the phone.
 
@@ -199,28 +215,28 @@ File access uses the same port, **8787**. You do not add a firewall rule for a n
 
 ## Files on the PC
 
-The Files tab reads and writes the PC. By default that is every drive, not a short list of folders.
+The Files tab reads and writes only the configured folders. A blank `ALLOWED_ROOTS` limits access to the `Desk` folder in your PC account's home directory; the server creates it automatically.
 
 `config/.env`:
 
 ```
-ALLOWED_ROOTS=ALL
+ALLOWED_ROOTS=
 MAX_UPLOAD_MB=200
 MAX_TEXT_BYTES=1000000
 CODER_MODEL=qwen2.5-coder:14b
 ```
 
-`ALL` means every fixed, removable, and mapped drive (`C:`, `D:`, `F:`, and so on). Desk looks again each time you open Files, so a USB disk shows up after you plug it in. An older `config/.env` gets these lines the next time Desk starts. You can leave them as they are.
+Add the folders you actually want to work on, separated by semicolons, then restart Desk:
 
-To limit Desk later, list folders separated by semicolons and restart:
+```env
+ALLOWED_ROOTS=C:\Users\Austin\Desk;D:\Projects;C:\Users\Austin\Documents
+```
 
-```
-ALLOWED_ROOTS=C:\Users\Austin\Desktop;C:\Users\Austin\Downloads;D:\Work
-```
+Existing settings are preserved on upgrade. **If your existing `.env` says `ALLOWED_ROOTS=ALL`, replace it with explicit folders to restrict access.** `ALL` remains an explicit opt-in to every drive accessible to the server process. API-key holders have read/write access inside the configured roots. The API key itself stays in `config/.env`; do not place that configuration folder inside a shared root.
 
 On the phone:
 
-1. Open the Files tab. The first screen is the drives.
+1. Open the Files tab. The first screen is the allowed folders (or drives if explicitly enabled).
 2. Open a drive, then a folder. Upload picks files on the phone (more than one is fine) and sends them to that folder, with a progress bar.
 3. From another app, choose Share, then Desk. Pick the folder on the PC and upload.
 4. Tap a text file to read it. You can edit it yourself and tap Save. You do not have to use the model.
@@ -230,6 +246,22 @@ On the phone:
 8. Download saves a PC file onto the phone.
 
 Code files use `qwen2.5-coder:14b` when `ollama list` has it, and `DEFAULT_MODEL` otherwise. A file that is too big for the model's context can still be edited by hand. The screen says when the PC is offline, the API key was rejected, the file is too large, or the path is outside the allowed drives.
+
+## Work on a whole folder in chat
+
+1. Add your project folder to `ALLOWED_ROOTS` as above and restart the PC gateway.
+2. On the phone, open **Files**, navigate into the folder, and tap **Chat with this folder**. You can also use the attach button inside a chat and choose **Use this folder**.
+3. Ask a question or request changes across files, for example: “Explain how this project starts” or “Update the API response and its Android client together.” The folder remains attached for follow-up messages and is remembered with the conversation.
+4. Tap the coverage card to see which files the model received. Each question rescans subfolders and ranks text files by the question. Mention a specific relative path to focus the next response, or select a smaller subfolder.
+5. When the model proposes edits, tap **Review changes**. Review each file's diff or complete new contents, then **Save all changes**. Chat alone never writes files.
+
+Folder chat can replace multiple existing text files and create new text files, including subdirectories. It does not execute commands, install packages, delete files, or rename files. Saves check the original contents first, refuse stale proposals, and write `.bak` copies for existing files. A failed multi-file save attempts to restore files already written; this is not an atomic transaction against PC crashes or simultaneous external file edits. Proposals expire after 30 minutes or a server restart; ask again if one expires. A repeated save of the same completed proposal does not write twice.
+
+Context is bounded: up to 1,000 indexed text files, 10,000 scanned entries, 2 MB of source read per request, 100 KB per source file, and a smaller selection fitted to the model context. The UI reports omitted/skipped files and capped listings. The entire folder does not have to fit in the model at once. Folder chat uses at least an 8,192-token context, so it may use more GPU memory than ordinary chat. `NUM_CTX` can raise this up to 32,768, subject to model/GPU limits. Token budgeting is approximate; smaller folders or fewer changed files work best on a 7B model.
+
+Hidden files/folders, common dependency/build folders, signing material and common credential filenames are excluded. Add a `.deskignore` file at the workspace root for extra glob patterns, one per line, such as `data/*` or `*.log`. Comments start with `#`; rules are exclusion-only, not full gitignore syntax. File contents are sent only to the configured Ollama endpoint. Arbitrarily named files can still contain secrets: choose appropriate workspace roots and ignore rules.
+
+The model's proposal format is one fenced `desk-changes` JSON array containing objects with relative `path` and complete `content`. Invalid or incomplete proposals cannot be saved. At most 12 changed files are accepted per proposal. A file omitted from context cannot be overwritten; ask again mentioning its path.
 
 ## Change the model
 
@@ -241,7 +273,7 @@ You can also change the default before the first start by editing `DEFAULT_MODEL
 
 ## Troubleshooting
 
-**The phone says it can't reach the desk.** The Desk window must still be open. The URL must start with `http://` and include `:8787`. The phone must be on the same Wi-Fi as the PC, or on Tailscale. Some guest networks block phones from seeing computers. Use the main Wi-Fi.
+**The phone says it can't reach the desk.** The Desk window must still be open. Use the PC's Wi-Fi or Tailscale address. The app adds `http://` and port `8787` to local addresses when omitted, and accepts a copied Phone URL banner line. It rejects phone loopback addresses and Ollama's port `11434`. The phone must be on the same Wi-Fi as the PC, or on Tailscale. Some guest networks block phones from seeing computers. Use the main Wi-Fi.
 
 **API key was rejected.** Copy the value after `API_KEY=` again. Do not include the quotes or the name `API_KEY`.
 
@@ -291,6 +323,8 @@ Endpoints, all except `GET /` require `Authorization: Bearer <API_KEY>` (or `X-A
 | POST | `/files/rename` | Rename inside the same folder. |
 | POST | `/files/delete` | Move to `.trash` on that drive. |
 | POST | `/files/ai` | Stream a proposed new version of a text file. Does not save it. |
+| POST | `/workspace/chat` | Stream folder coverage, chat tokens, and a multi-file proposal. Body: `folder`, `messages`, optional `model`. |
+| POST | `/workspace/apply` | Save a reviewed proposal. Body: `proposal_id`. Requires unchanged original files. |
 
 ## Tests
 
@@ -310,3 +344,4 @@ The tests stand in for Ollama, so they do not need a GPU. Android unit tests run
 cd android
 ./gradlew test assembleDebug
 ```
+
