@@ -39,7 +39,7 @@ def build_chat_body(
         "keep_alive": keep_alive,
         "options": {"num_ctx": num_ctx, "temperature": temperature},
     }
-    if model.split(":", 1)[0].lower() in {"ornith-1.5", "qwen3.5"}:
+    if model.split(":", 1)[0].lower() in {"ornith-1.5", "qwen3.5", "huihui_ai/qwen3.5-abliterated"}:
         body["think"] = False
     return body
 

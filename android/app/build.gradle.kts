@@ -15,8 +15,8 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "2.2.0"
+        versionCode = 9
+        versionName = "2.3.0"
         manifestPlaceholders["appLabel"] = "Desk"
     }
 
@@ -40,6 +40,7 @@ android {
 
     buildTypes {
         debug {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("privateRelease")
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             manifestPlaceholders["appLabel"] = "Desk Dev"

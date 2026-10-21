@@ -1,4 +1,4 @@
-# Desk 2.2.0
+# Desk 2.3.0
 
 Desk is a chat app for your phone. The model runs on your desktop PC, on the NVIDIA GPU you already have. The phone only shows the conversation.
 
@@ -7,6 +7,43 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 ```
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
+
+## Desk 2.3: in-app updates and model downloads
+
+Version **2.3.0**, build **9**, adds **Settings → Check for app updates**, APK download progress, SHA-256/package/version/signing-certificate verification and Android's installer. It uses a separate HTTPS connection to the project's GitHub release channel; the PC API key is never sent to GitHub. A completed download survives an app restart and is verified again before installation. Android asks you to allow installs from Desk and confirm the update. Matching signing keys and a higher versionCode are required to preserve chats/settings during an update.
+
+**Settings → Model catalog** installs models into Ollama on the PC. Downloads continue when the phone leaves Settings or disconnects. Refresh reconnects to their progress. Stop cancels the active pull; a retry resumes cached Ollama layers. The gateway verifies each model is listed before marking it installed, skips existing models, allows one download queue at a time and preserves your selected model. **Use model** switches after installation. Update and restart the PC gateway as well as installing this APK; an older gateway cannot provide the catalog.
+
+The catalog includes Ornith 1.5 9B, Qwen 3.5 4B and three publisher-described uncensored/steerable options checked October 21, 2026:
+
+| Model | Ollama tag | Approximate download |
+| --- | --- | --- |
+| [Qwen 3.5 Abliterated 4B](https://ollama.com/huihui_ai/qwen3.5-abliterated:4B) | `huihui_ai/qwen3.5-abliterated:4B` | 3.3 GB |
+| [Qwen 3.5 Abliterated 9B](https://ollama.com/huihui_ai/qwen3.5-abliterated:9b) | `huihui_ai/qwen3.5-abliterated:9b` | 6.6 GB |
+| [Dolphin 3 8B](https://ollama.com/library/dolphin3) | `dolphin3:8b` | 4.9 GB |
+
+**Install uncensored pack** installs 9B Qwen and Dolphin (about 11.5 GB on disk); 4B is available separately. Download size is not total VRAM usage: run one model at a time with moderate context on a 12 GB GPU and check `ollama ps`. Abliteration reduces refusals; coding quality can differ from the original model. HomeAI disables thinking for these Qwen variants for quicker replies. Web browsing still needs a separate search tool.
+
+To install the same pack from Windows, close the gateway, open Ollama, and run from the updated checkout:
+
+```powershell
+.\start.bat --install-uncensored
+```
+
+This runs the usual coding-model setup first, then installs the pack before starting the gateway. The pack itself preserves model selection. Linux: from `server`, run `.venv/bin/python -m app.model_catalog`. Downloads occur on the PC where these commands run; the cloud editor has no access to the PC's GPU or F drive.
+
+### Enable signed in-app updates once
+
+The connected GitHub API cannot set Actions secrets. On your PC, install JDK 17 and GitHub CLI, authenticate `gh auth login` with repository secret-management access, and run from the repository root:
+
+```powershell
+python scripts/setup_signing.py
+python scripts/configure_updates.py
+```
+
+If you already have the private `.homedesk/signing.properties` identity, skip `setup_signing.py`; keep that identity. `configure_updates.py` sends four signing secrets to Actions through stdin without printing them or storing a key in the repository. Back up `.homedesk` privately. Then run **Build Desk APK** in Actions on this branch. With secrets configured, builds sign both Desk and Desk Dev consistently and publish APKs and manifests to `desk-stable` and `desk-dev` GitHub releases. Without secrets, only the ordinary development artifact is built; no incompatible update is advertised. `build_release` can require signing rather than allowing that fallback. Tests and lint remain optional and off by default.
+
+Older APKs signed by another runner or the retired public key cannot update in place to this identity. A one-time installation of the privately signed build is necessary; preserve needed chats before uninstalling an old app. After that, **Check → Download → Install** updates in place. Every published app change must increase `versionCode` in `android/app/build.gradle.kts`; publish only the intended branch. The updater never bypasses Android's certificate check or silently installs an APK.
 
 ## Desk 2.2: whole-project context and local coding model
 
@@ -58,7 +95,7 @@ Check the running gateway from a second PowerShell window:
 Invoke-RestMethod 'http://127.0.0.1:8787/' | Select-Object server_version, capabilities
 ```
 
-Expect `2.2.0`, `workspace_chat`, and `workspace_apply`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
+Expect `2.3.0`, `workspace_chat`, `workspace_apply`, and `model_installs`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
 
 ## Desk 2.1 UI update
 
@@ -170,7 +207,7 @@ The APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Copy it to the phone (USB, email to yourself, or a shared folder). Open it. If Android blocks the install, allow installs for the app you used to open the file (Files, Chrome, or Gmail). The app is named **Desk**.
 
-The debug APK is **Desk Dev** (`com.homedesk.chat.dev`). It installs alongside Desk so testing does not overwrite your release app or its chats. Debug keys belong to the build machine; APKs from different machines may require reinstalling Desk Dev. Use a privately signed release for dependable updates.
+The debug APK is **Desk Dev** (`com.homedesk.chat.dev`). It installs alongside Desk so testing does not overwrite your release app or its chats. Without private signing configured, debug keys belong to the build machine and builds may require reinstalling Desk Dev. With private signing configured, both variants use the persistent private identity and their separate update channels.
 
 ### Private release signing (one-time setup)
 
@@ -188,7 +225,7 @@ All future release builds must use this same private identity. A newer versionCo
 
 Every push builds and uploads a **Desk Dev** APK under the workflow's artifacts. Automatic runs skip tests and lint. A manual run can optionally enable server/Android tests and lint with **run_checks**; pull requests do not trigger duplicate builds. Open [Actions](https://github.com/Strobingn/HomeAI/actions), select the branch run, then download its Desk Dev artifact.
 
-For privately signed release APKs, configure these [repository Actions secrets](https://github.com/Strobingn/HomeAI/settings/secrets/actions): `DESK_KEYSTORE_BASE64` (base64 of your private keystore), `DESK_STORE_PASSWORD`, `DESK_KEY_ALIAS`, and `DESK_KEY_PASSWORD` (values from your private properties file). Then manually run **Build Desk APK** on the desired branch with **build_release** enabled. The release job requires these secrets and removes its temporary key afterward. Secrets cannot be configured through the connected repository API used for this change.
+For privately signed release APKs, configure these [repository Actions secrets](https://github.com/Strobingn/HomeAI/settings/secrets/actions): `DESK_KEYSTORE_BASE64` (base64 of your private keystore), `DESK_STORE_PASSWORD`, `DESK_KEY_ALIAS`, and `DESK_KEY_PASSWORD` (values from your private properties file). Or use `python scripts/configure_updates.py` as described above. Builds with complete secrets publish signed updates automatically on the development branch or main; **build_release** requires signing. Temporary keys are removed afterward. Secrets cannot be configured through the connected repository API used for this change.
 
 ## 4. Connect the phone
 

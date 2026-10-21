@@ -41,6 +41,10 @@ if /I "%~1"=="--install-coder" (
   .venv\Scripts\python.exe -m app.setup_coder --if-needed
 )
 if errorlevel 1 echo Coding-model setup is incomplete. Starting the gateway with its existing configuration; restart to retry.
+if /I "%~1"=="--install-uncensored" (
+  .venv\Scripts\python.exe -m app.model_catalog
+  if errorlevel 1 echo The uncensored pack did not finish. Open Settings in Desk to resume the download.
+)
 .venv\Scripts\python.exe -m app.main
 if errorlevel 1 goto :stopped
 exit /b 0

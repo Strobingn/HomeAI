@@ -32,11 +32,12 @@ from app.ollama import (
     build_warm_body,
 )
 from app.state import ModelStore
+from app.model_catalog import ModelDownloads, register_model_routes
 from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
-SERVER_VERSION = "2.2.0"
-CAPABILITIES = ("workspace_chat", "workspace_apply")
+SERVER_VERSION = "2.3.0"
+CAPABILITIES = ("workspace_chat", "workspace_apply", "model_installs")
 
 
 class HealthOut(BaseModel):
@@ -195,10 +196,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if task is not None:
-            task.cancel()
+        await app.state.downloads.close()
+        current_task = app.state.warm_task
+        for pending in {task, current_task} - {None}:
+            pending.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await task
+                await pending
         await app.state.ollama.aclose()
 
 
@@ -222,7 +225,10 @@ def create_app(
     )
     app.state.settings = settings
     app.state.ollama = ollama
+    app.state.downloads = ModelDownloads(ollama)
+    register_model_routes(app)
     app.state.models = ModelStore(settings.state_path, settings.default_model)
+    app.state.warm_task = None
     app.state.workspaces = WorkspaceStore()
     app.state.files = file_service or FileService(
         allowed_roots=settings.allowed_roots,
@@ -290,6 +296,11 @@ def create_app(
         request.app.state.models.set(model)
         settings_now: Settings = request.app.state.settings
         # Refresh keep_alive and load weights without making the phone wait.
+        previous_warm = request.app.state.warm_task
+        if previous_warm is not None and not previous_warm.done():
+            previous_warm.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await previous_warm
         request.app.state.warm_task = asyncio.create_task(warm_selected(request.app))
         await asyncio.sleep(0)
         loaded = False
