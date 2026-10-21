@@ -34,7 +34,8 @@ class HistoryTest {
     @Test
     fun healthCopyDistinguishesAWarmModelFromAMissingOne() {
         val ready = interpretHealth(
-            HealthDto(status = "ok", ollama = "up", model = "qwen2.5:7b", modelLoaded = true),
+            HealthDto(status = "ok", ollama = "up", model = "qwen2.5:7b", modelLoaded = true,
+                capabilities = listOf("workspace_chat", "workspace_apply")),
         )
         assertTrue(ready.ok)
         assertEquals("Connected", ready.headline)
@@ -53,3 +54,4 @@ class HistoryTest {
         assertTrue(missing.detail.contains("ollama pull"))
     }
 }
+

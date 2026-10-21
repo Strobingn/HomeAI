@@ -267,7 +267,6 @@ class ChatViewModel(
     private fun showError(id: String, message: String) {
         _state.update { state ->
             state.copy(
-                banner = message,
                 messages = state.messages.map { item ->
                     if (item.id != id) {
                         item

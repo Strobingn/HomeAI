@@ -15,8 +15,8 @@ android {
         applicationId = "com.homedesk.chat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "2.1.0"
+        versionCode = 7
+        versionName = "2.1.1"
         manifestPlaceholders["appLabel"] = "Desk"
     }
 
@@ -98,6 +98,7 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 }
 

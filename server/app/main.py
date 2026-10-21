@@ -35,9 +35,13 @@ from app.state import ModelStore
 from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
+SERVER_VERSION = "2.1.1"
+CAPABILITIES = ("workspace_chat", "workspace_apply")
 
 
 class HealthOut(BaseModel):
+    server_version: str = SERVER_VERSION
+    capabilities: list[str] = Field(default_factory=lambda: list(CAPABILITIES))
     status: str
     ollama: str
     ollama_version: str | None = None
@@ -212,7 +216,7 @@ def create_app(
         )
     app = FastAPI(
         title="Home Desk",
-        version="2.0.0",
+        version=SERVER_VERSION,
         description="Streams a local Ollama model to the Desk phone app.",
         lifespan=lifespan,
     )
@@ -235,10 +239,12 @@ def create_app(
         return JSONResponse(status_code=422, content={"detail": detail})
 
     @app.get("/")
-    async def root() -> dict[str, str]:
+    async def root() -> dict[str, Any]:
         return {
             "service": "home-desk",
             "ok": "true",
+            "server_version": SERVER_VERSION,
+            "capabilities": list(CAPABILITIES),
             "hint": "This is the Desk server. In the phone app, enter this URL and the API key from config/.env.",
         }
 

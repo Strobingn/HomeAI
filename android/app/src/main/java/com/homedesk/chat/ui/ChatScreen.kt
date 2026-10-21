@@ -296,11 +296,11 @@ private fun MessageRow(message: ChatMessage, pending: Boolean, streaming: Boolea
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("DESK", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                    Text(if (message.error) "REQUEST FAILED" else "DESK", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (!streaming && message.content.isNotBlank()) IconButton(onClick = {
                         clipboard.setText(AnnotatedString(message.content))
-                    }) { Icon(Icons.Filled.ContentCopy, "Copy response") }
+                    }) { Icon(Icons.Filled.ContentCopy, if (message.error) "Copy error" else "Copy response") }
                 }
                 message.proposal?.let { proposal ->
                     FieldCard {
@@ -311,6 +311,7 @@ private fun MessageRow(message: ChatMessage, pending: Boolean, streaming: Boolea
                 }
                 if (pending) Text("Thinking…", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else if (message.error) InlineNotice(message.content)
                 else ChatMarkdown(message.content.substringBefore("```desk-changes"), Modifier.padding(top = 4.dp))
                 if (streaming && "```desk-changes" in message.content) Text("Preparing file changes…",
                     Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.bodyMedium)

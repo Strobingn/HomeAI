@@ -115,16 +115,14 @@ class DeskApi(private val client: OkHttpClient) {
     }
 
     private fun httpDetail(code: Int, raw: String): String {
-        val parsed = runCatching { json.decodeFromString(ErrorDto.serializer(), raw) }.getOrNull()
-        val detail = parsed?.detail?.takeIf { it.isNotBlank() }
-        if (detail != null) return detail
-        return "The server returned an error ($code)."
+        return httpErrorMessage(code, raw, json)
     }
 }
 
 class ChatStream(
     private val call: Call,
     private val json: Json,
+    private val missingRouteMessage: String? = null,
 ) {
     @Volatile
     private var canceled = false
@@ -148,11 +146,7 @@ class ChatStream(
                     )
                 }
                 if (!response.isSuccessful) {
-                    val raw = rawError()
-                    val detail = runCatching {
-                        json.decodeFromString(ErrorDto.serializer(), raw).detail
-                    }.getOrNull()
-                    throw DeskCallException(detail?.takeIf { it.isNotBlank() } ?: "The server returned an error (${response.code}).")
+                    throw DeskCallException(httpErrorMessage(response.code, rawError(), json, missingRouteMessage))
                 }
                 val source = response.body?.source()
                     ?: throw DeskCallException("The server closed the reply before it started.")
@@ -175,6 +169,17 @@ class ChatStream(
             throw error
         }
     }
+}
+
+internal fun httpErrorMessage(code: Int, raw: String, json: Json, missingRouteMessage: String? = null): String {
+    if (code == 401) return "The API key was rejected. Open config/.env on the PC and copy the value after API_KEY=."
+    val detail = runCatching { json.decodeFromString(ErrorDto.serializer(), raw).detail }
+        .getOrNull()?.takeIf { it.isNotBlank() }
+    // A missing route differs from a real 404 such as a folder that was removed.
+    if (code == 404 && missingRouteMessage != null && (detail == null || detail.equals("Not Found", ignoreCase = true))) {
+        return missingRouteMessage
+    }
+    return detail ?: "The server returned an error ($code)."
 }
 
 @Serializable

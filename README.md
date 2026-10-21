@@ -1,4 +1,4 @@
-# Desk 2.1
+# Desk 2.1.1
 
 Desk is a chat app for your phone. The model runs on your desktop PC, on the NVIDIA GPU you already have. The phone only shows the conversation.
 
@@ -7,6 +7,30 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 ```
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
+
+## Fixing “Not Found” in folder chat
+
+The Android app and PC gateway need to support folder chat. An old gateway can pass the connection test and list models while returning `404 Not Found` for `/workspace/chat`. Installing a new APK does not update or restart the PC gateway. Version **2.1.1**, build **7**, explains this error in chat, distinguishes failures from AI replies, and shows the gateway version and folder support in **Settings → Test connection**.
+
+Close the old Desk gateway window first (or end its HomeAI Gateway task in Task Scheduler). Then open PowerShell in the PC's existing HomeAI repository. For the requested F-drive copy:
+
+```powershell
+Set-Location 'F:\home AI App'
+git fetch origin
+git switch codex/folder-ai-and-reliability
+git pull --ff-only
+.\start.bat
+```
+
+If the repository is elsewhere, use that folder instead. Run `start.bat` only after the Git commands succeed; do not discard local edits if Git reports a conflict. `config/.env` is preserved. If the F-drive folder does not exist yet, use the clone command below first. A scheduled task must point to this updated copy rather than an old checkout.
+
+Check the running gateway from a second PowerShell window:
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8787/' | Select-Object server_version, capabilities
+```
+
+Expect `2.1.1`, `workspace_chat`, and `workspace_apply`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
 
 ## Desk 2.1 UI update
 
@@ -27,7 +51,7 @@ Version **2.0.0**, build **5**, adds a redesigned home dashboard, grayscale dark
 ## Get the code
 
 ```bash
-git clone https://github.com/Strobingn/HomeAI.git
+git clone --branch codex/folder-ai-and-reliability https://github.com/Strobingn/HomeAI.git
 cd HomeAI
 ```
 
@@ -214,10 +238,12 @@ Set the PC so it does not go to sleep while you want the phone to reach it. A sl
 
 ## Update an existing PC
 
-From the project folder (`C:\Users\Austin\HomeAI`):
+Close the running gateway, then open the project folder (`F:\home AI App` for the requested copy):
 
 ```bat
-git pull
+git fetch origin
+git switch codex/folder-ai-and-reliability
+git pull --ff-only
 ```
 
 Restart Desk so it installs the new Python packages and picks up the file settings.
@@ -225,7 +251,7 @@ Restart Desk so it installs the new Python packages and picks up the file settin
 - If `start.bat` is open in a window, close that window and double-click `start.bat` again. The script installs anything new from `server\requirements.txt` (including `python-multipart`).
 - If Task Scheduler starts the gateway, open Task Scheduler, select the HomeAI Gateway task, choose End, then Run. That task should point at `start.bat`.
 
-The phone URL and the API key do not change. Install the new Desk APK over the old one.
+The phone URL and API key stay the same when updating the same checkout. A separate clone has its own `config/.env`; use its key. Install the new APK using the same private signing identity for an in-place release update. Desk Dev builds from different runners may require reinstalling the development app.
 
 File access uses the same port, **8787**. You do not add a firewall rule for a new port. If the phone already connects, leave the firewall alone. The Windows note below is only for a PC that has never been allowed through.
 

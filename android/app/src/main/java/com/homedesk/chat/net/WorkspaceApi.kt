@@ -9,6 +9,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
+const val GATEWAY_UPDATE_INSTRUCTIONS = "Update the PC copy of HomeAI to the codex/folder-ai-and-reliability branch, " +
+    "close the old gateway window, and run start.bat from the updated folder. " +
+    "Installing an APK does not update the PC gateway."
+
+const val WORKSPACE_UPDATE_MESSAGE = "Folder chat is unavailable on this PC gateway. " +
+    GATEWAY_UPDATE_INSTRUCTIONS + " Then send your question again."
+
 @Serializable
 data class WorkspaceContext(
     val root: String,
@@ -38,7 +45,7 @@ class WorkspaceApi(private val client: OkHttpClient) {
             .header("Accept", "text/event-stream")
             .post(json.encodeToString(WorkspaceBody.serializer(), body).toRequestBody(type))
             .build()
-        return ChatStream(client.newCall(request), json)
+        return ChatStream(client.newCall(request), json, missingRouteMessage = WORKSPACE_UPDATE_MESSAGE)
     }
 
     fun apply(baseUrl: String, apiKey: String, proposal: WorkspaceProposal) {
@@ -52,8 +59,7 @@ class WorkspaceApi(private val client: OkHttpClient) {
         call.execute().use { response ->
             val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val detail = runCatching { json.decodeFromString(WorkspaceError.serializer(), raw).detail }.getOrNull()
-                throw DeskCallException(detail ?: "The server could not save these changes (${response.code}).")
+                throw DeskCallException(httpErrorMessage(response.code, raw, json, WORKSPACE_UPDATE_MESSAGE))
             }
         }
     }
@@ -65,5 +71,3 @@ private data class WorkspaceBody(val folder: String, val model: String, val mess
 @Serializable
 private data class ApplyBody(val proposal_id: String)
 
-@Serializable
-private data class WorkspaceError(val detail: String? = null)
