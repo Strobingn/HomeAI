@@ -232,7 +232,7 @@ Add the folders you actually want to work on, separated by semicolons, then rest
 ALLOWED_ROOTS=C:\Users\Austin\Desk;D:\Projects;C:\Users\Austin\Documents
 ```
 
-Existing settings are preserved on upgrade. **If your existing `.env` says `ALLOWED_ROOTS=ALL`, replace it with explicit folders to restrict access.** `ALL` remains an explicit opt-in to every drive accessible to the server process. API-key holders have read/write access inside the configured roots. The API key itself stays in `config/.env`; do not place that configuration folder inside a shared root.
+Explicit folder settings are preserved on upgrade. Older versions automatically wrote `ALLOWED_ROOTS=ALL`; that value now falls back to the home `Desk` folder unless you also explicitly set `ALLOW_ALL_DRIVES=1`. Add your actual project folders to `ALLOWED_ROOTS` to use them. To deliberately enable every drive accessible to the server process, set both `ALLOWED_ROOTS=ALL` and `ALLOW_ALL_DRIVES=1`. API-key holders have read/write access inside the configured roots. The API key itself stays in `config/.env`; do not place that configuration folder inside a shared root.
 
 On the phone:
 

@@ -96,6 +96,13 @@ def parse_allowed_roots(raw: str | None) -> tuple[str, ...]:
     return tuple(parts) if parts else (default_workspace(),)
 
 
+def effective_allowed_roots(raw: str | None, allow_all: bool = False) -> tuple[str, ...]:
+    roots = parse_allowed_roots(raw)
+    # Older versions silently wrote ALL into every .env. That is not an
+    # explicit grant, so all-drive access now needs a separate opt-in.
+    return roots if roots != ("ALL",) or allow_all else (default_workspace(),)
+
+
 def parse_max_upload_bytes(raw: str | None) -> int:
     text = (raw or str(DEFAULT_MAX_UPLOAD_MB)).strip()
     try:
@@ -185,7 +192,9 @@ class Settings:
             state_path=state_path,
             env_path=env_path,
             warm_on_start=as_bool(os.environ.get("WARM_ON_START"), True),
-            allowed_roots=parse_allowed_roots(os.environ.get("ALLOWED_ROOTS")),
+            allowed_roots=effective_allowed_roots(
+                os.environ.get("ALLOWED_ROOTS"), as_bool(os.environ.get("ALLOW_ALL_DRIVES"), False),
+            ),
             max_upload_bytes=parse_max_upload_bytes(os.environ.get("MAX_UPLOAD_MB")),
             max_text_bytes=parse_max_text_bytes(os.environ.get("MAX_TEXT_BYTES")),
             coder_model=coder_model,

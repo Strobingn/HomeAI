@@ -4,6 +4,7 @@ import pytest
 
 from app.config import (
     DEFAULT_MODEL,
+    effective_allowed_roots,
     clean_model,
     parse_allowed_roots,
     parse_keep_alive,
@@ -95,3 +96,12 @@ def test_upsert_key_replaces_only_the_key_line() -> None:
     assert "PORT=8787" in text
     assert text.startswith("# comment")
 
+
+
+def test_legacy_all_drives_setting_needs_separate_opt_in():
+    assert effective_allowed_roots("ALL") == (str(Path.home() / "Desk"),)
+    assert effective_allowed_roots("ALL", allow_all=True) == ("ALL",)
+    assert effective_allowed_roots(str(Path.home() / "Projects")) == (str(Path.home() / "Projects"),)
+    migrated = append_file_settings("API_KEY=abc\nALLOWED_ROOTS=ALL\n")
+    assert "ALLOW_ALL_DRIVES=0" in migrated
+    assert append_file_settings(migrated) == migrated

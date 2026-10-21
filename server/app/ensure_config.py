@@ -39,6 +39,7 @@ def upsert_key(text: str, key: str) -> str:
 
 _FILE_DEFAULTS = (
     ("ALLOWED_ROOTS", ""),
+    ("ALLOW_ALL_DRIVES", "0"),
     ("MAX_UPLOAD_MB", "200"),
     ("MAX_TEXT_BYTES", "1000000"),
     ("CODER_MODEL", "qwen2.5-coder:14b"),
