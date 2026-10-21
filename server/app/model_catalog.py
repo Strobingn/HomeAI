@@ -103,6 +103,8 @@ class ModelDownloads:
             self.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self.task
+            if self.state["phase"] == "downloading":
+                self.state.update(phase="cancelled", status="Download stopped. Retry to resume downloaded layers.")
 
 
 def register_model_routes(app: FastAPI) -> None:

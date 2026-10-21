@@ -135,15 +135,15 @@ On the PC, open a terminal and run:
 ollama pull qwen2.5:7b
 ```
 
-That tag is Qwen2.5 7B Instruct at Q4_K_M, about 4.7 GB. It is the default because speed matters on a 12 GB card: the weights leave several gigabytes free for the chat cache, and a 7B model produces tokens quickly. Desk keeps it loaded in VRAM so the next reply does not wait on a cold start.
+That tag is the legacy fallback, Qwen2.5 7B Instruct Q4_K_M, about 4.7 GB. The current Windows coding-model setup installs Ornith 1.5 9B and selects it after a successful load. Existing configurations and Linux setups can still use the fallback; use the coding-model setup above to adopt Ornith.
 
 Other models you can switch to later:
 
 | Model | When to use it |
 | --- | --- |
-| `qwen2.5:7b` | Default. Fastest good chat model for this PC. |
-| `llama3.1:8b` | Another fast 8B model, if you prefer Llama. |
-| `qwen2.5:14b` | Smarter, still fits in 12 GB at the default quant, but slower and tighter on long chats. |
+| `ornith-1.5:9b` | Current Windows coding recommendation; about 6.6 GB download. |
+| `qwen3.5:4b-q4_K_M` | Smaller speed-oriented choice; about 3.3 GB download. |
+| `qwen2.5:7b` | Legacy fallback for older Ollama/configuration setups. |
 
 Check that Ollama is using the GPU:
 
@@ -151,7 +151,7 @@ Check that Ollama is using the GPU:
 ollama ps
 ```
 
-The processor column should say 100% GPU after the first reply. If it says CPU, the NVIDIA driver is not visible to Ollama.
+Check the processor column after a reply. CPU or mixed CPU/GPU residency can mean the weights and context exceed available VRAM or that GPU drivers/runtime support need attention. Close other GPU workloads and reduce context before comparing speed.
 
 ## 2. Start Desk on the PC
 

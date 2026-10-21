@@ -117,7 +117,7 @@ class AppUpdates(private val app: Application) {
         runOperation {
             checkCertificate(release)
             directory.mkdirs()
-            val temporary = File(directory, "update.part")
+            val temporary = File(directory, "download.apk")
             _state.update { it.copy(busy = true, ready = false, progress = 0f, message = "Downloading ${release.versionName}…") }
             try {
                 val call = client.newCall(Request.Builder().url(release.url).build())

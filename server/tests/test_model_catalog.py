@@ -102,3 +102,13 @@ def test_abliterated_qwen_uses_fast_non_thinking_payload():
     for row in CATALOG:
         if "qwen3.5-abliterated" in row["model"]:
             assert build_chat_body(row["model"], [], -1, 8192, 0.2)["think"] is False
+
+
+def test_stop_before_worker_starts_does_not_leave_a_stuck_job():
+    async def run():
+        downloads = ModelDownloads(PullOllama())
+        downloads.start(UNCENSORED_PACK)
+        await downloads.close()
+        assert downloads.state["phase"] == "cancelled"
+        assert not downloads.active
+    asyncio.run(run())
