@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 # On a 12 GB NVIDIA card that leaves several gigabytes for the KV cache,
 # and a 7B Q4 generates tokens quickly. Speed is the point of this default.
 DEFAULT_MODEL = "qwen2.5:7b"
-DEFAULT_CODER_MODEL = "qwen2.5-coder:14b"
+DEFAULT_CODER_MODEL = "ornith-1.5:9b"
+DEFAULT_WEB_CODER_MODEL = "huihui_ai/qwen3.5-abliterated:9b"
 DEFAULT_PORT = 8787
 DEFAULT_NUM_CTX = 4096
 DEFAULT_MAX_UPLOAD_MB = 200
@@ -77,17 +78,30 @@ def clean_model(name: str) -> str:
     return text
 
 
+def default_workspace() -> str:
+    return str(Path.home() / "Desk")
+
+
 def parse_allowed_roots(raw: str | None) -> tuple[str, ...]:
     """ALL means every drive. Otherwise a semicolon-separated folder list."""
-    text = "ALL" if raw is None else raw.strip()
-    if not text or text.upper() == "ALL":
+    text = (raw or "").strip()
+    if not text:
+        return (default_workspace(),)
+    if text.upper() == "ALL":
         return ("ALL",)
     parts: list[str] = []
     for piece in text.split(";"):
         item = piece.strip().strip('"').strip("'")
         if item:
             parts.append(item)
-    return tuple(parts) if parts else ("ALL",)
+    return tuple(parts) if parts else (default_workspace(),)
+
+
+def effective_allowed_roots(raw: str | None, allow_all: bool = False) -> tuple[str, ...]:
+    roots = parse_allowed_roots(raw)
+    # Older versions silently wrote ALL into every .env. That is not an
+    # explicit grant, so all-drive access now needs a separate opt-in.
+    return roots if roots != ("ALL",) or allow_all else (default_workspace(),)
 
 
 def parse_max_upload_bytes(raw: str | None) -> int:
@@ -127,10 +141,13 @@ class Settings:
     warm_on_start: bool
     connect_timeout: float = 2.0
     read_timeout: float = 8.0
-    allowed_roots: tuple[str, ...] = ("ALL",)
+    allowed_roots: tuple[str, ...] = ()
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_MB * 1024 * 1024
     max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES
     coder_model: str = DEFAULT_CODER_MODEL
+    web_search_enabled: bool = False
+    web_search_provider: str = "ddgs"
+    ollama_api_key: str = field(default="", repr=False)
 
     @classmethod
     def load(cls) -> Settings:
@@ -167,6 +184,9 @@ class Settings:
         except ValueError as exc:
             raise SystemExit(f"CODER_MODEL is not valid. {exc}") from exc
 
+        web_provider = os.environ.get("WEB_SEARCH_PROVIDER", "ddgs").strip().lower()
+        if web_provider not in {"ddgs", "ollama"}:
+            raise SystemExit("WEB_SEARCH_PROVIDER must be ddgs or ollama.")
         return cls(
             api_key=api_key,
             ollama_base_url=ollama or "http://127.0.0.1:11434",
@@ -179,8 +199,14 @@ class Settings:
             state_path=state_path,
             env_path=env_path,
             warm_on_start=as_bool(os.environ.get("WARM_ON_START"), True),
-            allowed_roots=parse_allowed_roots(os.environ.get("ALLOWED_ROOTS")),
+            allowed_roots=effective_allowed_roots(
+                os.environ.get("ALLOWED_ROOTS"), as_bool(os.environ.get("ALLOW_ALL_DRIVES"), False),
+            ),
             max_upload_bytes=parse_max_upload_bytes(os.environ.get("MAX_UPLOAD_MB")),
             max_text_bytes=parse_max_text_bytes(os.environ.get("MAX_TEXT_BYTES")),
             coder_model=coder_model,
+            web_search_enabled=as_bool(os.environ.get("WEB_SEARCH_ENABLED"), False),
+            web_search_provider=web_provider,
+            ollama_api_key=os.environ.get("OLLAMA_API_KEY", "").strip(),
         )
+

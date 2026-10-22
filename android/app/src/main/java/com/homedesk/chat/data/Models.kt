@@ -1,6 +1,7 @@
 package com.homedesk.chat.data
 
 import kotlinx.serialization.Serializable
+import com.homedesk.chat.net.WorkspaceProposal
 
 object DeskDefaults {
     const val MODEL = "qwen2.5:7b"
@@ -13,6 +14,8 @@ data class ChatMessage(
     val content: String,
     val createdAt: Long,
     val error: Boolean = false,
+    val proposal: WorkspaceProposal? = null,
+    val applied: Boolean = false,
 )
 
 @Serializable
@@ -22,6 +25,7 @@ data class Conversation(
     val model: String,
     val updatedAt: Long,
     val messages: List<ChatMessage> = emptyList(),
+    val workspace: String? = null,
 )
 
 @Serializable
@@ -50,3 +54,4 @@ fun modelHistory(messages: List<ChatMessage>, limit: Int = 40): List<OutboundMes
         .toList()
         .takeLast(limit)
 }
+

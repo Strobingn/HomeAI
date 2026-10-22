@@ -6,7 +6,8 @@ import kotlinx.serialization.json.Json
 
 sealed interface StreamEvent {
     data class Token(val text: String) : StreamEvent
-    data class Done(val model: String?, val proposed: String? = null) : StreamEvent
+    data class Done(val model: String?, val proposed: String? = null, val proposal: WorkspaceProposal? = null) : StreamEvent
+    data class Context(val report: WorkspaceContext) : StreamEvent
     data class Error(val message: String) : StreamEvent
 }
 
@@ -27,11 +28,12 @@ object SseParser {
             return listOf(StreamEvent.Error(event.error))
         }
         val events = mutableListOf<StreamEvent>()
+        event.context?.let { events += StreamEvent.Context(it) }
         if (!event.content.isNullOrEmpty()) {
             events += StreamEvent.Token(event.content)
         }
         if (event.done) {
-            events += StreamEvent.Done(event.model, event.proposed)
+            events += StreamEvent.Done(event.model, event.proposed, event.proposal)
         }
         return events
     }
@@ -44,4 +46,7 @@ private data class StreamDto(
     val error: String? = null,
     val model: String? = null,
     val proposed: String? = null,
+    val proposal: WorkspaceProposal? = null,
+    val context: WorkspaceContext? = null,
 )
+

@@ -5,9 +5,25 @@ from __future__ import annotations
 import os
 import secrets
 import sys
+import tempfile
+import contextlib
 from pathlib import Path
 
 from app.config import project_root
+
+
+def write_private_env(path: Path, text: str) -> None:
+    """Atomically replace configuration without making an API-key file public."""
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=path.name + ".", suffix=".tmp", dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(FileNotFoundError):
+                temporary.unlink()
 
 
 def current_api_key(text: str) -> str:
@@ -22,26 +38,31 @@ def current_api_key(text: str) -> str:
 
 
 def upsert_key(text: str, key: str) -> str:
+    return upsert_setting(text, "API_KEY", key)
+
+
+def upsert_setting(text: str, name: str, value: str) -> str:
     lines = text.splitlines()
     found = False
     output: list[str] = []
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("API_KEY=") and not stripped.startswith("#"):
-            output.append(f"API_KEY={key}")
+        if not stripped.startswith("#") and "=" in stripped and stripped.split("=", 1)[0].strip() == name:
+            output.append(f"{name}={value}")
             found = True
         else:
             output.append(line)
     if not found:
-        output.append(f"API_KEY={key}")
+        output.append(f"{name}={value}")
     return "\n".join(output).rstrip() + "\n"
 
 
 _FILE_DEFAULTS = (
-    ("ALLOWED_ROOTS", "ALL"),
+    ("ALLOWED_ROOTS", ""),
+    ("ALLOW_ALL_DRIVES", "0"),
     ("MAX_UPLOAD_MB", "200"),
     ("MAX_TEXT_BYTES", "1000000"),
-    ("CODER_MODEL", "qwen2.5-coder:14b"),
+    ("CODER_MODEL", "ornith-1.5:9b"),
 )
 
 
@@ -65,8 +86,8 @@ def append_file_settings(text: str) -> str:
     if "ALLOWED_ROOTS" not in present:
         lines.extend(
             [
-                "# Files. ALL means every fixed and removable drive, detected each time you browse.",
-                "# To limit Desk later, use semicolon-separated folders:",
+                "# Files. Blank limits access to the Desk folder inside your home folder.",
+                "# To add project folders, use semicolon-separated absolute paths:",
                 r"# ALLOWED_ROOTS=C:\Users\Austin\Desktop;D:\Work",
             ]
         )
@@ -95,7 +116,7 @@ def ensure_env(root: Path) -> str | None:
         text = upsert_key(text, created)
     text = append_file_settings(text)
     if created is not None or not env_path.is_file() or text != original:
-        env_path.write_text(text, encoding="utf-8")
+        write_private_env(env_path, text)
         try:
             os.chmod(env_path, 0o600)
         except OSError:
@@ -126,3 +147,4 @@ if __name__ == "__main__":
         if exc.code not in (0, None):
             print(exc, file=sys.stderr)
         raise
+

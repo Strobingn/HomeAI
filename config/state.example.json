@@ -1,0 +1,4 @@
+{
+  "_description": "Example only. Desk creates state.json automatically. model is the selected Ollama model tag, restored at startup and used for chat requests without an explicit model. An installed-model selection in the phone app or the coding-model installer updates it. DEFAULT_MODEL in .env is the fallback when state.json is absent or invalid.",
+  "model": "ornith-1.5:9b"
+}

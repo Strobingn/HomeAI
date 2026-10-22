@@ -28,4 +28,9 @@ echo "Installing the server. The first time takes a minute."
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m app.ensure_config
+if [[ "${1:-}" == "--install-web-coder" ]]; then
+  .venv/bin/python -m pip install -r requirements-web.txt
+  .venv/bin/python -m app.setup_web_coder
+fi
 exec .venv/bin/python -m app.main
+

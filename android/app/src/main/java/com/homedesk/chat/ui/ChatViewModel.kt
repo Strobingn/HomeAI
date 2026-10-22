@@ -13,6 +13,8 @@ import com.homedesk.chat.net.ChatStream
 import com.homedesk.chat.net.DeskCallException
 import com.homedesk.chat.net.ModelInfo
 import com.homedesk.chat.net.StreamEvent
+import com.homedesk.chat.net.WorkspaceContext
+import com.homedesk.chat.net.WorkspaceProposal
 import com.homedesk.chat.net.explainTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,10 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val draft: String = "",
     val attachedPath: String? = null,
+    val workspace: String? = null,
+    val context: WorkspaceContext? = null,
+    val reviewing: WorkspaceProposal? = null,
+    val applying: Boolean = false,
     val sending: Boolean = false,
     val streamingId: String? = null,
     val banner: String? = null,
@@ -57,6 +63,7 @@ class ChatViewModel(
                     title = existing?.title ?: "New chat",
                     model = model,
                     messages = existing?.messages ?: emptyList(),
+                    workspace = it.workspace ?: existing?.workspace,
                 )
             }
         }
@@ -66,7 +73,38 @@ class ChatViewModel(
 
     fun attach(path: String) {
         if (path.isBlank()) return
-        _state.update { it.copy(attachedPath = path, banner = null) }
+        _state.update { it.copy(attachedPath = path, workspace = null, context = null, banner = null) }
+    }
+
+    fun setWorkspace(path: String?) {
+        if (_state.value.sending || _state.value.applying) return
+        _state.update { it.copy(workspace = path, attachedPath = null, context = null) }
+        viewModelScope.launch(Dispatchers.IO) { persist() }
+    }
+
+    fun review(proposal: WorkspaceProposal?) = _state.update { it.copy(reviewing = proposal) }
+
+    fun applyProposal() {
+        val snapshot = _state.value
+        val proposal = snapshot.reviewing ?: return
+        if (snapshot.applying || snapshot.sending) return
+        _state.update { it.copy(applying = true, banner = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val settings = graph.settings.get()
+            try {
+                graph.workspace.apply(settings.baseUrl, settings.apiKey, proposal)
+                _state.update { state -> state.copy(
+                    reviewing = null,
+                    banner = "Saved ${proposal.changes.size} files. Previous versions have .bak copies.",
+                    messages = state.messages.map { if (it.proposal?.id == proposal.id) it.copy(applied = true) else it },
+                ) }
+                persist()
+            } catch (error: IOException) {
+                _state.update { it.copy(banner = error.message ?: "Could not save changes.") }
+            } finally {
+                _state.update { it.copy(applying = false) }
+            }
+        }
     }
 
     fun clearAttachment() = _state.update { it.copy(attachedPath = null) }
@@ -106,8 +144,7 @@ class ChatViewModel(
         val clean = model.trim()
         if (clean.isEmpty()) return
         _state.update { it.copy(model = clean, banner = null) }
-        val current = graph.settings.get()
-        graph.settings.save(current.copy(model = clean))
+        graph.settings.saveModel(clean)
         viewModelScope.launch(Dispatchers.IO) {
             val settings = graph.settings.get()
             if (!settings.isReady) return@launch
@@ -124,7 +161,7 @@ class ChatViewModel(
     fun send() {
         val snapshot = _state.value
         val text = snapshot.draft.trim()
-        if (text.isEmpty() || snapshot.sending || !snapshot.ready) return
+        if (text.isEmpty() || snapshot.sending || snapshot.applying || !snapshot.ready) return
         val settings = graph.settings.get()
         if (!settings.isReady) {
             _state.update { it.copy(banner = "Add the server URL and API key in Settings.") }
@@ -165,20 +202,34 @@ class ChatViewModel(
         val model = _state.value.model
         viewModelScope.launch(Dispatchers.IO) {
             persist()
-            val call = graph.api.openChat(settings.baseUrl, settings.apiKey, model, outbound, file = attached)
-            stream = call
+            var call: ChatStream? = null
             try {
+                call = if (snapshot.workspace != null) {
+                    graph.workspace.openChat(settings.baseUrl, settings.apiKey, snapshot.workspace, model, outbound)
+                } else {
+                    graph.api.openChat(settings.baseUrl, settings.apiKey, model, outbound, file = attached)
+                }
+                stream = call
                 call.read { event ->
                     when (event) {
                         is StreamEvent.Token -> appendToken(assistantId, event.text)
-                        is StreamEvent.Done -> Unit
+                        is StreamEvent.Context -> _state.update { it.copy(context = event.report) }
+                        is StreamEvent.Done -> if (event.proposal != null) {
+                            _state.update { state -> state.copy(messages = state.messages.map {
+                                if (it.id == assistantId) it.copy(
+                                    proposal = event.proposal,
+                                    content = it.content.substringBefore("```desk-changes").trim()
+                                        .ifBlank { "Review the proposed file changes below." },
+                                ) else it
+                            }) }
+                        }
                         is StreamEvent.Error -> showError(assistantId, event.message)
                     }
                 }
             } catch (error: DeskCallException) {
                 showError(assistantId, error.message ?: "The server rejected that message.")
             } catch (error: IOException) {
-                if (!call.isCanceled()) {
+                if (call?.isCanceled() != true) {
                     showError(assistantId, explainTransport(error, settings.baseUrl))
                 }
             } finally {
@@ -216,7 +267,6 @@ class ChatViewModel(
     private fun showError(id: String, message: String) {
         _state.update { state ->
             state.copy(
-                banner = message,
                 messages = state.messages.map { item ->
                     if (item.id != id) {
                         item
@@ -232,7 +282,7 @@ class ChatViewModel(
 
     private fun persist() {
         val snapshot = _state.value
-        val kept = snapshot.messages.filter { it.content.isNotBlank() }
+        val kept = snapshot.messages.filter { it.content.isNotBlank() || it.proposal != null }
         if (kept.isEmpty()) return
         graph.chats.upsert(
             Conversation(
@@ -241,7 +291,9 @@ class ChatViewModel(
                 model = snapshot.model,
                 updatedAt = System.currentTimeMillis(),
                 messages = kept,
+                workspace = snapshot.workspace,
             ),
         )
     }
 }
+

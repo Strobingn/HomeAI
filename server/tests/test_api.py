@@ -102,6 +102,8 @@ def test_root_is_public(tmp_path: Path) -> None:
         response = client.get("/")
     assert response.status_code == 200
     assert response.json()["service"] == "home-desk"
+    assert response.json()["server_version"] == "2.3.1"
+    assert set(response.json()["capabilities"]) >= {"workspace_chat", "workspace_apply"}
 
 
 def test_health_requires_the_key(tmp_path: Path) -> None:
@@ -127,6 +129,8 @@ def test_health_reports_a_warm_model(tmp_path: Path) -> None:
     assert body["model"] == "qwen2.5:7b"
     assert body["model_loaded"] is True
     assert body["ollama_version"] == "0.9.0"
+    assert body["server_version"] == "2.3.1"
+    assert set(body["capabilities"]) >= {"workspace_chat", "workspace_apply"}
 
 
 def test_health_when_ollama_is_down(tmp_path: Path) -> None:
@@ -138,6 +142,7 @@ def test_health_when_ollama_is_down(tmp_path: Path) -> None:
     assert body["status"] == "degraded"
     assert body["ollama"] == "down"
     assert "already installed" in body["detail"]
+    assert "workspace_chat" in body["capabilities"]
 
 
 def test_health_when_the_model_is_not_pulled(tmp_path: Path) -> None:
@@ -298,3 +303,4 @@ def test_lifespan_stays_up_when_the_model_is_missing(tmp_path: Path) -> None:
     asyncio.run(run())
     assert fake.warm_bodies
     assert fake.closed is True
+

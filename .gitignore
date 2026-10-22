@@ -1,5 +1,7 @@
 config/.env
 config/state.json
+config/coder-setup.json
+config/web-coder-setup.json
 config/*.tmp
 
 server/.venv/
@@ -20,3 +22,11 @@ android/.kotlin/
 *.apk
 *.aab
 .DS_Store
+
+
+# Never commit signing material.
+*.keystore
+*.jks
+*.p12
+*.pfx
+**/signing.properties

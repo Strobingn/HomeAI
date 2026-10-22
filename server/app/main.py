@@ -32,11 +32,18 @@ from app.ollama import (
     build_warm_body,
 )
 from app.state import ModelStore
+from app.model_catalog import ModelDownloads, register_model_routes
+from app.web_search import WebSearch, WebSearchError, prepare_web, register_web_routes
+from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
+SERVER_VERSION = "2.3.1"
+CAPABILITIES = ("workspace_chat", "workspace_apply", "model_installs", "web_search")
 
 
 class HealthOut(BaseModel):
+    server_version: str = SERVER_VERSION
+    capabilities: list[str] = Field(default_factory=lambda: list(CAPABILITIES))
     status: str
     ollama: str
     ollama_version: str | None = None
@@ -111,10 +118,11 @@ async def _health(app: FastAPI) -> HealthOut:
     model = app.state.models.selected
     ollama = app.state.ollama
     try:
-        version = await ollama.version()
-        installed = await ollama.tags()
-        running = await ollama.running_names()
-    except OllamaUnreachable:
+        async with asyncio.timeout(6.0):
+            version, installed, running = await asyncio.gather(
+                ollama.version(), ollama.tags(), ollama.running_names(),
+            )
+    except (OllamaUnreachable, TimeoutError):
         return HealthOut(
             status="degraded",
             ollama="down",
@@ -189,10 +197,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if task is not None:
-            task.cancel()
+        await app.state.downloads.close()
+        current_task = app.state.warm_task
+        for pending in {task, current_task} - {None}:
+            pending.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await task
+                await pending
         await app.state.ollama.aclose()
 
 
@@ -210,13 +220,19 @@ def create_app(
         )
     app = FastAPI(
         title="Home Desk",
-        version="1.0.0",
+        version=SERVER_VERSION,
         description="Streams a local Ollama model to the Desk phone app.",
         lifespan=lifespan,
     )
     app.state.settings = settings
     app.state.ollama = ollama
+    app.state.downloads = ModelDownloads(ollama)
+    register_model_routes(app)
+    app.state.web = WebSearch(settings)
+    register_web_routes(app)
     app.state.models = ModelStore(settings.state_path, settings.default_model)
+    app.state.warm_task = None
+    app.state.workspaces = WorkspaceStore()
     app.state.files = file_service or FileService(
         allowed_roots=settings.allowed_roots,
         max_upload_bytes=settings.max_upload_bytes,
@@ -232,10 +248,12 @@ def create_app(
         return JSONResponse(status_code=422, content={"detail": detail})
 
     @app.get("/")
-    async def root() -> dict[str, str]:
+    async def root() -> dict[str, Any]:
         return {
             "service": "home-desk",
             "ok": "true",
+            "server_version": SERVER_VERSION,
+            "capabilities": list(CAPABILITIES),
             "hint": "This is the Desk server. In the phone app, enter this URL and the API key from config/.env.",
         }
 
@@ -281,6 +299,11 @@ def create_app(
         request.app.state.models.set(model)
         settings_now: Settings = request.app.state.settings
         # Refresh keep_alive and load weights without making the phone wait.
+        previous_warm = request.app.state.warm_task
+        if previous_warm is not None and not previous_warm.done():
+            previous_warm.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await previous_warm
         request.app.state.warm_task = asyncio.create_task(warm_selected(request.app))
         await asyncio.sleep(0)
         loaded = False
@@ -330,6 +353,10 @@ def create_app(
 
         async def events() -> AsyncIterator[str]:
             try:
+                # Search only the user's explicit query, before attaching any file data.
+                web = await prepare_web(request.app, [{"role": item.role, "content": item.content} for item in body.messages])
+                if web:
+                    payload["messages"] = [{"role": "system", "content": web.context}, *messages]
                 async for chunk in request.app.state.ollama.stream_chat(payload):
                     if await request.is_disconnected():
                         break
@@ -340,9 +367,11 @@ def create_app(
                     if content:
                         yield sse({"content": content})
                     if chunk.get("done"):
+                        if web:
+                            yield sse({"content": web.footer})
                         yield sse({"done": True, "model": model})
                         return
-            except ModelMissing as exc:
+            except (WebSearchError, ModelMissing) as exc:
                 yield sse({"error": str(exc)})
             except OllamaUnreachable as exc:
                 yield sse({"error": str(exc)})
@@ -359,6 +388,7 @@ def create_app(
         )
 
     register_file_routes(app)
+    register_workspace_routes(app)
     return app
 
 
@@ -388,3 +418,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

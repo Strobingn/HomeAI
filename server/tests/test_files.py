@@ -28,9 +28,9 @@ def service_for(root: Path, **kwargs: object) -> FileService:
     return FileService((str(root),), **kwargs)  # type: ignore[arg-type]
 
 
-def test_all_mode_is_the_default_and_can_be_narrowed() -> None:
-    assert parse_allowed_roots(None) == ("ALL",)
-    assert parse_allowed_roots("") == ("ALL",)
+def test_all_mode_requires_explicit_opt_in() -> None:
+    assert parse_allowed_roots(None) == (str(Path.home() / "Desk"),)
+    assert parse_allowed_roots("") == (str(Path.home() / "Desk"),)
     assert parse_allowed_roots(" all ") == ("ALL",)
     assert parse_allowed_roots(r"C:\Users\Austin\Desktop; D:\Work") == (
         r"C:\Users\Austin\Desktop",
@@ -325,7 +325,7 @@ def test_ai_streams_a_proposal_and_does_not_save_it(tmp_path: Path) -> None:
     script = root / "main.py"
     script.write_text("print('old')\n", encoding="utf-8")
     fake = FakeOllama()
-    fake.installed = ["qwen2.5:7b", "qwen2.5-coder:14b"]
+    fake.installed = ["qwen2.5:7b", "ornith-1.5:9b"]
     fake.tokens = ["Adding a line.\n", "```file\n", "print('old')\nprint('new')\n", "```"]
     app, fake = _app(tmp_path, fake, file_service=service_for(root))
     with TestClient(app) as client:
@@ -337,9 +337,9 @@ def test_ai_streams_a_proposal_and_does_not_save_it(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "print('new')" in response.text
     assert '"done":true' in response.text
-    assert "qwen2.5-coder:14b" in response.text
+    assert "ornith-1.5:9b" in response.text
     assert script.read_text(encoding="utf-8") == "print('old')\n"
-    assert fake.chat_bodies[-1]["model"] == "qwen2.5-coder:14b"
+    assert fake.chat_bodies[-1]["model"] == "ornith-1.5:9b"
     assert fake.chat_bodies[-1]["options"]["temperature"] == 0.2
     assert "print('old')" in fake.chat_bodies[-1]["messages"][-1]["content"]
 
@@ -482,3 +482,4 @@ def test_upload_over_the_limit_on_the_api(tmp_path: Path) -> None:
 
 async def _stream(payload: bytes):
     yield payload
+
