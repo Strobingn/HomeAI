@@ -113,7 +113,7 @@ def register_model_routes(app: FastAPI) -> None:
     @app.get("/models/catalog", dependencies=auth)
     async def catalog() -> dict[str, Any]:
         return {"models": CATALOG, "uncensored_pack": UNCENSORED_PACK,
-                "note": "Download sizes are approximate, not VRAM requirements. Run one model at a time; context also uses memory. Models do not include web access."}
+                "note": "Download sizes are approximate, not VRAM requirements. Run one model at a time; context also uses memory. Enable the PC web-coder setup to search with /web; model weights alone do not browse."}
 
     @app.get("/model-installs", dependencies=auth)
     async def install_status() -> dict[str, Any]:

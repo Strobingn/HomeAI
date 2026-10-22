@@ -8,6 +8,53 @@ Phone  --Wi-Fi or Tailscale-->  PC port 8787 (Desk)  -->  Ollama on port 11434  
 
 Ollama is already installed on the PC. Desk does not install it. It checks that Ollama is answering, keeps the model loaded, and streams each token to the phone so the reply shows up as it is written.
 
+## Uncensored coding model with web search — PC setup
+
+The recommended 12 GB option for this setup is [Huihui Qwen 3.5 9B Abliterated](https://huggingface.co/huihui-ai/Huihui-Qwen3.5-9B-abliterated), using [Ollama's Q4_K_M tag](https://ollama.com/huihui_ai/qwen3.5-abliterated:9b) `huihui_ai/qwen3.5-abliterated:9b` (about 6.6 GB). It is the publisher's refusal-reduced Qwen variant. The full-precision Hugging Face weights are larger; use this quantized build on a 12 GB GPU. Coding quality and speed are not benchmarked on your PC here. Start at 8192 context tokens; actual GPU residency is reported during setup and can be checked with `ollama ps`.
+
+This updates the **PC gateway to 2.3.1**. The existing Android 2.3.0 app works with it; no APK reinstall is needed for web search.
+
+1. Close the old Desk gateway window, leave Ollama open, and update the PC files from the `codex/folder-ai-and-reliability` branch. If this is a Git checkout, use the commands below. If you copied a ZIP instead, copy the updated branch files into the existing folder; preserve `config/.env` and `config/state.json`.
+2. Run the web-coder setup. It installs the search dependency, tests live search, downloads the one selected model, verifies Ollama lists it, unloads other resident models, loads it at 8192 context tokens, obtains a completed test reply, and checks its loaded-model visibility. Only then does it select the model for chat and file coding, enable web search, and start the gateway. Downloaded layers resume on retry. The PC API key and other settings are preserved. Later ordinary starts keep this setup instead of downloading/selecting Ornith again.
+
+```powershell
+cd "F:\home AI App"
+git fetch origin
+git switch codex/folder-ai-and-reliability
+git pull --ff-only
+.\start.bat --install-web-coder
+```
+
+If the checkout is already updated, only the last command is needed. Git will stop if local changes conflict; this setup does not discard your work. Linux/macOS: `./start.sh --install-web-coder`.
+
+3. Keep the new gateway window open. On the phone, use **Settings → Test connection & sync model**. It should select `huihui_ai/qwen3.5-abliterated:9b`.
+4. In normal chat or attached-folder chat, send:
+
+```text
+/web Find the official FastAPI documentation for file uploads and write an example.
+```
+
+The gateway runs a real search, sends the retrieved snippets to the local model, and appends source links. Web results are reference data; they are not instructions or permission to modify files. Folder changes still require review and Apply. Ordinary questions stay local; `/web`, `Search the web for …`, `Search online for …` or `Look up online …` explicitly request a lookup. Only that typed query goes to search providers; prior messages and folder contents are not used as generated search queries. Search queries are limited to 500 characters, results are bounded, and a failed lookup produces an error rather than a fabricated web answer. This is explicit search retrieval, not an autonomous browser or a model that has internet access built into its weights.
+
+The default uses the pinned DDGS metasearch library with DuckDuckGo/Bing, without an API key and with SafeSearch off. Providers can still block or rate-limit requests. Search workers have a 20-second overall deadline, two-worker limit and cancellation cleanup. For the optional official Ollama search service, get a key from [Ollama settings](https://ollama.com/settings/keys), set these in the PC's `config/.env`, then restart:
+
+```dotenv
+WEB_SEARCH_ENABLED=1
+WEB_SEARCH_PROVIDER=ollama
+OLLAMA_API_KEY=your_ollama_search_key
+```
+
+That key is separate from the phone's `API_KEY` and stays on the server. Official search requests go only to `https://ollama.com/api/web_search`. See [Ollama's web-search documentation](https://docs.ollama.com/capabilities/web-search). The optional provider uses the same bounded result format and explicit chat commands.
+
+To verify the **running** gateway from a second PC terminal after setup:
+
+```powershell
+cd "F:\home AI App\server"
+.\.venv\Scripts\python.exe -m app.setup_web_coder --verify-server
+```
+
+This authenticates to localhost, checks that `/health` sees the selected model, confirms `/web/status` is ready, and requires real results from `/web/search`. It prints a confirmation only when these pass. No API keys are printed. GPU placement is checked separately with `ollama ps`; a partial CPU load is reported rather than called full-GPU execution. The cloud editor cannot run this installer on your PC or verify your home-server installation without a remote connection.
+
 ## Desk 2.3: in-app updates and model downloads
 
 Version **2.3.0**, build **9**, adds **Settings → Check for app updates**, APK download progress, SHA-256/package/version/signing-certificate verification and Android's installer. It uses a separate HTTPS connection to the project's GitHub release channel; the PC API key is never sent to GitHub. A completed download survives an app restart and is verified again before installation. Android asks you to allow installs from Desk and confirm the update. Matching signing keys and a higher versionCode are required to preserve chats/settings during an update.
@@ -22,7 +69,7 @@ The catalog includes Ornith 1.5 9B, Qwen 3.5 4B and three publisher-described un
 | [Qwen 3.5 Abliterated 9B](https://ollama.com/huihui_ai/qwen3.5-abliterated:9b) | `huihui_ai/qwen3.5-abliterated:9b` | 6.6 GB |
 | [Dolphin 3 8B](https://ollama.com/library/dolphin3) | `dolphin3:8b` | 4.9 GB |
 
-**Install uncensored pack** installs 9B Qwen and Dolphin (about 11.5 GB on disk); 4B is available separately. Download size is not total VRAM usage: run one model at a time with moderate context on a 12 GB GPU and check `ollama ps`. Abliteration reduces refusals; coding quality can differ from the original model. HomeAI disables thinking for these Qwen variants for quicker replies. Web browsing still needs a separate search tool.
+**Install uncensored pack** installs 9B Qwen and Dolphin (about 11.5 GB on disk); 4B is available separately. Download size is not total VRAM usage: run one model at a time with moderate context on a 12 GB GPU and check `ollama ps`. Abliteration reduces refusals; coding quality can differ from the original model. HomeAI disables thinking for these Qwen variants for quicker replies. Web lookup is available through the PC web-coder setup above; model weights alone do not browse.
 
 To install the same pack from Windows, close the gateway, open Ollama, and run from the updated checkout:
 
@@ -69,7 +116,7 @@ To explicitly rerun setup and select the recommendation again:
 
 After setup, use **Settings → Test connection & sync model** on the phone. This adopts the PC's selected model for subsequent chats. The cloud developer cannot download onto your PC or write its F drive; the launcher performs installation on the machine where you run it. Linux users can run `.venv/bin/python -m app.setup_coder` from the `server` directory after running `start.sh` once.
 
-As checked October 21, 2026: [Ornith-1.5-9B](https://huggingface.co/ornith-ai/Ornith-1.5-9B) is a recent coding/tool-use model; [Ollama's 4-bit build](https://ollama.com/library/ornith-1.5:9b) is about 6.6 GB. It is expected to fit a 12 GB GPU at moderate context sizes, but real GPU residency and speed must be checked on the PC with `ollama ps`. It is not claimed to be the newest Hub upload or the fastest model without a hardware benchmark. [Qwen3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5:4b-q4_K_M), about 3.3 GB, is a smaller speed-oriented alternative. HomeAI sends `think: false` for these families to reduce reasoning delay; that trades away some reasoning quality. Neither weights nor the current HomeAI gateway have web access by themselves: search/browsing requires a separately connected tool.
+As checked October 21, 2026: [Ornith-1.5-9B](https://huggingface.co/ornith-ai/Ornith-1.5-9B) is a recent coding/tool-use model; [Ollama's 4-bit build](https://ollama.com/library/ornith-1.5:9b) is about 6.6 GB. It is expected to fit a 12 GB GPU at moderate context sizes, but real GPU residency and speed must be checked on the PC with `ollama ps`. It is not claimed to be the newest Hub upload or the fastest model without a hardware benchmark. [Qwen3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5:4b-q4_K_M), about 3.3 GB, is a smaller speed-oriented alternative. HomeAI sends `think: false` for these families to reduce reasoning delay; that trades away some reasoning quality. The model weights do not browse by themselves. The PC web-coder setup above connects explicit search to HomeAI chat and folder chat.
 
 `config/state.json` is generated runtime state and remains ignored by Git. Its `model` property is the selected Ollama tag restored at restart, used when requests do not explicitly choose a model. Generated state now includes a description; `config/state.example.json` documents the format. Do not commit your runtime state. Startup/shutdown and HTTP smoke checks live in `server/tests/test_lifecycle.py`, where pytest discovers them; `tests/__init__.py` documents the test layout.
 
@@ -95,7 +142,7 @@ Check the running gateway from a second PowerShell window:
 Invoke-RestMethod 'http://127.0.0.1:8787/' | Select-Object server_version, capabilities
 ```
 
-Expect `2.3.0`, `workspace_chat`, `workspace_apply`, and `model_installs`. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
+Expect `2.3.1`, `workspace_chat`, `workspace_apply`, `model_installs`, and `web_search`. Search also needs the web setup enabled; check `/web/status` for readiness. If those are absent, the process listening on port 8787 is still old or is running from another folder. Keep the new gateway window open, then send your question again on the phone. On Linux, restart `start.sh` from the updated checkout instead.
 
 ## Desk 2.1 UI update
 

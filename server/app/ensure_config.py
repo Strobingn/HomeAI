@@ -5,9 +5,25 @@ from __future__ import annotations
 import os
 import secrets
 import sys
+import tempfile
+import contextlib
 from pathlib import Path
 
 from app.config import project_root
+
+
+def write_private_env(path: Path, text: str) -> None:
+    """Atomically replace configuration without making an API-key file public."""
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=path.name + ".", suffix=".tmp", dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(FileNotFoundError):
+                temporary.unlink()
 
 
 def current_api_key(text: str) -> str:
@@ -100,7 +116,7 @@ def ensure_env(root: Path) -> str | None:
         text = upsert_key(text, created)
     text = append_file_settings(text)
     if created is not None or not env_path.is_file() or text != original:
-        env_path.write_text(text, encoding="utf-8")
+        write_private_env(env_path, text)
         try:
             os.chmod(env_path, 0o600)
         except OSError:

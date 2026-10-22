@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 # and a 7B Q4 generates tokens quickly. Speed is the point of this default.
 DEFAULT_MODEL = "qwen2.5:7b"
 DEFAULT_CODER_MODEL = "ornith-1.5:9b"
+DEFAULT_WEB_CODER_MODEL = "huihui_ai/qwen3.5-abliterated:9b"
 DEFAULT_PORT = 8787
 DEFAULT_NUM_CTX = 4096
 DEFAULT_MAX_UPLOAD_MB = 200
@@ -144,6 +145,9 @@ class Settings:
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_MB * 1024 * 1024
     max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES
     coder_model: str = DEFAULT_CODER_MODEL
+    web_search_enabled: bool = False
+    web_search_provider: str = "ddgs"
+    ollama_api_key: str = field(default="", repr=False)
 
     @classmethod
     def load(cls) -> Settings:
@@ -180,6 +184,9 @@ class Settings:
         except ValueError as exc:
             raise SystemExit(f"CODER_MODEL is not valid. {exc}") from exc
 
+        web_provider = os.environ.get("WEB_SEARCH_PROVIDER", "ddgs").strip().lower()
+        if web_provider not in {"ddgs", "ollama"}:
+            raise SystemExit("WEB_SEARCH_PROVIDER must be ddgs or ollama.")
         return cls(
             api_key=api_key,
             ollama_base_url=ollama or "http://127.0.0.1:11434",
@@ -198,5 +205,8 @@ class Settings:
             max_upload_bytes=parse_max_upload_bytes(os.environ.get("MAX_UPLOAD_MB")),
             max_text_bytes=parse_max_text_bytes(os.environ.get("MAX_TEXT_BYTES")),
             coder_model=coder_model,
+            web_search_enabled=as_bool(os.environ.get("WEB_SEARCH_ENABLED"), False),
+            web_search_provider=web_provider,
+            ollama_api_key=os.environ.get("OLLAMA_API_KEY", "").strip(),
         )
 

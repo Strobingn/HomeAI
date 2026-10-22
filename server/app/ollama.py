@@ -114,12 +114,16 @@ class HttpxOllama:
         models = data.get("models", []) if isinstance(data, dict) else []
         return [item for item in models if isinstance(item, dict)]
 
-    async def running_names(self) -> list[str]:
+    async def running_models(self) -> list[dict[str, Any]]:
         response = await self._request("GET", "/api/ps")
         if response.status_code >= 400:
             raise OllamaError(_error_text(response.text) or f"Ollama returned {response.status_code}")
         data = response.json()
         models = data.get("models", []) if isinstance(data, dict) else []
+        return [row for row in models if isinstance(row, dict)]
+
+    async def running_names(self) -> list[str]:
+        models = await self.running_models()
         names: list[str] = []
         for item in models:
             if not isinstance(item, dict):

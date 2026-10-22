@@ -35,6 +35,7 @@ if errorlevel 1 goto :fail
 cd server
 .venv\Scripts\python.exe -m app.ensure_config
 if errorlevel 1 goto :fail
+if /I "%~1"=="--install-web-coder" goto :install_web_coder
 if /I "%~1"=="--install-coder" (
   .venv\Scripts\python.exe -m app.setup_coder
 ) else (
@@ -45,9 +46,17 @@ if /I "%~1"=="--install-uncensored" (
   .venv\Scripts\python.exe -m app.model_catalog
   if errorlevel 1 echo The uncensored pack did not finish. Open Settings in Desk to resume the download.
 )
+:run_gateway
 .venv\Scripts\python.exe -m app.main
 if errorlevel 1 goto :stopped
 exit /b 0
+
+:install_web_coder
+.venv\Scripts\python.exe -m pip install -r requirements-web.txt
+if errorlevel 1 goto :fail
+.venv\Scripts\python.exe -m app.setup_web_coder
+if errorlevel 1 goto :stopped
+goto :run_gateway
 
 :python_missing
 echo Python 3.11 or newer was not found through either py or python.

@@ -33,11 +33,12 @@ from app.ollama import (
 )
 from app.state import ModelStore
 from app.model_catalog import ModelDownloads, register_model_routes
+from app.web_search import WebSearch, WebSearchError, prepare_web, register_web_routes
 from app.workspace import WorkspaceStore, register_workspace_routes
 
 log = logging.getLogger("desk")
-SERVER_VERSION = "2.3.0"
-CAPABILITIES = ("workspace_chat", "workspace_apply", "model_installs")
+SERVER_VERSION = "2.3.1"
+CAPABILITIES = ("workspace_chat", "workspace_apply", "model_installs", "web_search")
 
 
 class HealthOut(BaseModel):
@@ -227,6 +228,8 @@ def create_app(
     app.state.ollama = ollama
     app.state.downloads = ModelDownloads(ollama)
     register_model_routes(app)
+    app.state.web = WebSearch(settings)
+    register_web_routes(app)
     app.state.models = ModelStore(settings.state_path, settings.default_model)
     app.state.warm_task = None
     app.state.workspaces = WorkspaceStore()
@@ -350,6 +353,10 @@ def create_app(
 
         async def events() -> AsyncIterator[str]:
             try:
+                # Search only the user's explicit query, before attaching any file data.
+                web = await prepare_web(request.app, [{"role": item.role, "content": item.content} for item in body.messages])
+                if web:
+                    payload["messages"] = [{"role": "system", "content": web.context}, *messages]
                 async for chunk in request.app.state.ollama.stream_chat(payload):
                     if await request.is_disconnected():
                         break
@@ -360,9 +367,11 @@ def create_app(
                     if content:
                         yield sse({"content": content})
                     if chunk.get("done"):
+                        if web:
+                            yield sse({"content": web.footer})
                         yield sse({"done": True, "model": model})
                         return
-            except ModelMissing as exc:
+            except (WebSearchError, ModelMissing) as exc:
                 yield sse({"error": str(exc)})
             except OllamaUnreachable as exc:
                 yield sse({"error": str(exc)})

@@ -1,6 +1,7 @@
 config/.env
 config/state.json
 config/coder-setup.json
+config/web-coder-setup.json
 config/*.tmp
 
 server/.venv/

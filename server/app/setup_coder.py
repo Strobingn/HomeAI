@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from app.config import DEFAULT_CODER_MODEL, Settings
-from app.ensure_config import upsert_setting
+from app.ensure_config import upsert_setting, write_private_env
 from app.ollama import HttpxOllama, OllamaError, OllamaUnreachable, build_warm_body
 from app.state import ModelStore
 
@@ -19,9 +19,7 @@ RECOMMENDED_MODEL = DEFAULT_CODER_MODEL
 def configure(settings: Settings, model: str) -> None:
     text = settings.env_path.read_text(encoding="utf-8") if settings.env_path.exists() else ""
     text = upsert_setting(upsert_setting(text, "CODER_MODEL", model), "DEFAULT_MODEL", model)
-    temporary = settings.env_path.with_name(settings.env_path.name + ".tmp")
-    temporary.write_text(text, encoding="utf-8")
-    temporary.replace(settings.env_path)
+    write_private_env(settings.env_path, text)
     ModelStore(settings.state_path, settings.default_model).set(model)
 
 
@@ -30,6 +28,14 @@ async def install(settings: Settings, *, if_needed: bool = False) -> None:
     ollama = HttpxOllama(settings.ollama_base_url)
     try:
         installed = {str(row.get("name", "")).casefold() for row in await ollama.tags()}
+        if if_needed:
+            try:
+                web_setup = json.loads(settings.env_path.with_name("web-coder-setup.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                web_setup = None
+            if isinstance(web_setup, dict) and web_setup.get("verified") is True and str(web_setup.get("model", "")).casefold() in installed:
+                print("Verified web-coding setup is installed. Keeping your current model selection.", flush=True)
+                return
         try:
             recorded = json.loads(marker.read_text(encoding="utf-8"))
         except (OSError, ValueError):
